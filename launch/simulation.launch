@@ -16,6 +16,7 @@
         "/>
   </include>
 
+  <!--
   <!-- Start SLAM system -->
   <include file="$(find hector_mapping)/launch/mapping_default.launch">
     <arg name="odom_frame" value="world"/>
@@ -28,7 +29,8 @@
 
   <!-- Start RViz visualization with preset config -->
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find hector_quadrotor_demo)/rviz_cfg/indoor_slam.rviz"/>
-  
+  -->
+
 </launch>
 
 
