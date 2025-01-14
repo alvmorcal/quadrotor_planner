@@ -140,7 +140,7 @@ if __name__ == "__main__":
     bounds = {
         "x": [-10, 10],
         "y": [-10, 10],
-        "z": [0, 10]
+        "z": [0, 20]
     }
 
     with open("rrt_input.json", "r") as f:
