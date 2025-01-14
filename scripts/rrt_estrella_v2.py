@@ -140,9 +140,9 @@ class DroneNavigator:
         self.rate = rospy.Rate(10)
 
         # PID Controllers for X, Y, Z
-        self.pid_x = PID(1.0, 0.05, 0.5)
-        self.pid_y = PID(1.0, 0.05, 0.5)
-        self.pid_z = PID(2.0, 0.1, 1.0)
+        self.pid_x = PID(2.0, 0.01, 0.8)
+        self.pid_y = PID(2.0, 0.01, 0.8)
+        self.pid_z = PID(3.0, 0.05, 1.2)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -174,7 +174,7 @@ class DroneNavigator:
             if rospy.is_shutdown():
                 break
 
-            proximity_radius = 0.2 if i == len(waypoints) - 1 else 0.5
+            proximity_radius = 0.2 if i == len(waypoints) - 1 else 0.3
 
             # Configura los setpoints para cada eje
             self.pid_x.setpoint = waypoint[0]
