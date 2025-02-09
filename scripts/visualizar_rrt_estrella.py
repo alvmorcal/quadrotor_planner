@@ -143,7 +143,7 @@ if __name__ == "__main__":
         "z": [0, 20]
     }
 
-    with open("rrt_input.json", "r") as f:
+    with open("world.json", "r") as f:
         obstacles = json.load(f)["obstacles"]
 
     start = [0, 0, 0]
