@@ -124,7 +124,7 @@ def compute_potential_field(X, Y, z, goal, obstacles, m_goal=1.0, R_soi=3.0):
 
 if __name__ == '__main__':
     # Cargar el mapa desde el archivo JSON
-    json_file = "rrt_input.json"  # Asegúrate de que el archivo se encuentre en el directorio de trabajo
+    json_file = "world.json"  # Asegúrate de que el archivo se encuentre en el directorio de trabajo
     bounds, obstacles = load_map(json_file)
     
     # Seleccionar la sección (slice) en z para visualizar el campo potencial
