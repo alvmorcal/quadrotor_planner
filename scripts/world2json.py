@@ -86,7 +86,7 @@ bounds = {
 }
 
 # Ruta del archivo de salida
-output_file = "rrt_input.json"
+output_file = "world.json"
 
 # Generar archivo JSON
 generate_rrt_input(world_file, output_file, bounds)
