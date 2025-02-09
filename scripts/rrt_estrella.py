@@ -402,7 +402,7 @@ if __name__ == '__main__':
         }
 
         # Cargar obstáculos desde archivo JSON
-        with open("/home/alvmorcal/robmov_ws/src/quadrotor_planner/scripts/rrt_input.json", "r") as f:
+        with open("/home/alvmorcal/robmov_ws/src/quadrotor_planner/scripts/world.json", "r") as f:
             obstacles = json.load(f)["obstacles"]
 
         # Crear instancia de DroneNavigator
