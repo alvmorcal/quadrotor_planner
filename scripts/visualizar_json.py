@@ -44,5 +44,5 @@ def visualize_environment(json_file):
     plt.show()
 
 # Ruta al archivo JSON
-json_file = "/home/alvmorcal/robmov_ws/src/quadrotor_planner/scripts/rrt_input.json"
+json_file = "/home/alvmorcal/robmov_ws/src/quadrotor_planner/scripts/world.json"
 visualize_environment(json_file)
