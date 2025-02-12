@@ -10,7 +10,7 @@ import matplotlib
 # Usar backend interactivo (asegúrate de tener instalado PyQt5)
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # Para proyección 3D
+from mpl_toolkits.mplot3d import Axes3D  # Para la proyección 3D
 from matplotlib.patches import Rectangle
 from datetime import datetime
 
@@ -18,13 +18,32 @@ from datetime import datetime
 plt.ion()
 
 # =============================================================================
+# Clase PID
+# -----------------------------------------------------------------------------
+# Implementa un controlador PID simple para cada eje.
+# =============================================================================
+class PID:
+    def __init__(self, kp, ki, kd, setpoint=0):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.setpoint = setpoint
+        self.last_error = 0
+        self.integral = 0
+
+    def compute(self, current_value, dt):
+        error = self.setpoint - current_value
+        self.integral += error * dt
+        derivative = (error - self.last_error) / dt if dt > 0 else 0
+        self.last_error = error
+        return self.kp * error + self.ki * self.integral + self.kd * derivative
+
+# =============================================================================
 # Clase DroneNavigator
 # -----------------------------------------------------------------------------
-# Se encarga de comunicarse con ROS, activar motores, leer la posición actual y
-# navegar usando campos potenciales. Además, detecta mínimos locales y, en ese
-# caso, muestra un corte en el plano XY con la distribución del campo potencial,
-# calculado de forma similar al ejemplo que compartiste, mostrando tanto el
-# objetivo como la ubicación actual del UAV.
+# Se encarga de comunicarse con ROS, activar los motores, leer la posición
+# actual y navegar usando campos potenciales. Se detectan mínimos locales y se
+# comanda al dron utilizando un controlador PID para cada eje.
 # =============================================================================
 class DroneNavigator:
     def __init__(self, bounds, obstacles):
@@ -35,6 +54,12 @@ class DroneNavigator:
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
+
+        # Inicializamos los controladores PID para cada eje.
+        # Estos parámetros se pueden ajustar según la respuesta deseada.
+        self.pid_x = PID(2.0, 0.01, 0.8)
+        self.pid_y = PID(2.0, 0.01, 0.8)
+        self.pid_z = PID(3.0, 0.05, 1.2)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -60,18 +85,27 @@ class DroneNavigator:
             return (0, 0, 0)
 
     # =============================================================================
-    # Método de navegación basado en campos potenciales con detección de mínimos locales
+    # Método de navegación basado en campos potenciales con PID para comandar
+    # las velocidades.
+    #
+    # En cada iteración:
+    #   - Se calcula la fuerza atractiva y repulsiva para obtener el vector total.
+    #   - Se define una posición deseada (current + F_total * dt).
+    #   - Se actualizan los setpoints de cada PID.
+    #   - Se calculan las velocidades que corrigen el error entre la posición actual
+    #     y el setpoint.
+    #   - Se integra la velocidad para generar el nuevo comando de posición.
     # =============================================================================
     def potential_field_navigation(self, goal):
-        # Parámetros para la navegación (se usan otros para el cálculo del campo 2D)
-        k_att = 1.0   # coeficiente de atracción (usado para la navegación)
-        k_rep = 2.0   # coeficiente de repulsión (usado para la navegación)
-        d0 = 2.0      # distancia de influencia de los obstáculos (navegación)
-        dt = 0.1      # paso de tiempo
+        # Parámetros para la navegación por campos potenciales
+        k_att = 1.0   # coeficiente de atracción
+        k_rep = 2.0   # coeficiente de repulsión
+        d0 = 4.0      # distancia de influencia de los obstáculos
+        dt = 0.1      # intervalo de tiempo
 
-        # Parámetros para detectar mínimos locales
-        epsilon_force = 0.01       # si la norma de la fuerza total es menor que este valor
-        local_min_threshold = 50   # iteraciones consecutivas con fuerza muy pequeña
+        # Parámetros para la detección de mínimos locales
+        epsilon_force = 0.01       # umbral de fuerza para considerar que hay un mínimo local
+        local_min_threshold = 50   # número de iteraciones consecutivas con fuerza muy pequeña
         local_min_counter = 0
 
         trajectory = []  # almacena la trayectoria seguida
@@ -82,6 +116,7 @@ class DroneNavigator:
                 rospy.sleep(0.1)
                 continue
 
+            # Obtener la posición actual
             pos = np.array([self.current_pose.x, self.current_pose.y, self.current_pose.z])
             trajectory.append(pos.copy())
 
@@ -90,17 +125,17 @@ class DroneNavigator:
                 rospy.loginfo("Objetivo alcanzado.")
                 break
 
-            # Fuerza atractiva (modelo cuadrático para la navegación)
+            # Calcular fuerza atractiva (modelo cuadrático)
             F_att = -k_att * (pos - goal_np)
 
-            # Fuerza repulsiva: contribución de cada obstáculo (modelo caja)
+            # Calcular fuerza repulsiva: contribución de cada obstáculo (modelo caja)
             F_rep_total = np.array([0.0, 0.0, 0.0])
             for obs in self.obstacles:
                 obs_center = np.array(obs["pose"])
                 size = np.array(obs["size"])
                 min_corner = obs_center - size / 2.0
                 max_corner = obs_center + size / 2.0
-                # Punto más cercano en el obstáculo
+                # Se calcula el punto más cercano en el obstáculo
                 closest_point = np.clip(pos, min_corner, max_corner)
                 diff = pos - closest_point
                 d = np.linalg.norm(diff)
@@ -114,22 +149,35 @@ class DroneNavigator:
             F_total = F_att + F_rep_total
             norm_F_total = np.linalg.norm(F_total)
 
-            # Detectar mínimo local
+            # Detección de mínimo local
             if norm_F_total < epsilon_force:
                 local_min_counter += 1
             else:
                 local_min_counter = 0
 
             if local_min_counter > local_min_threshold:
-                rospy.logwarn("Mínimo local detectado. Deteniendo el trayecto.")
+                rospy.logwarn("Se ha detectado un mínimo local. Deteniendo el trayecto.")
                 self.display_force_field_slice(goal, pos)
                 break
 
-            # Actualizar posición integrando la "velocidad" (igual a la fuerza total)
-            v = F_total
-            new_pos = pos + v * dt
+            # --- Integración con PID ---
+            # Se define la posición deseada usando la salida del campo potencial
+            desired_pos = pos + F_total * dt
 
-            # Publicar el nuevo comando de posición
+            # Actualizar los setpoints de los controladores PID
+            self.pid_x.setpoint = desired_pos[0]
+            self.pid_y.setpoint = desired_pos[1]
+            self.pid_z.setpoint = desired_pos[2]
+
+            # Calcular velocidades de corrección en cada eje
+            vx = self.pid_x.compute(pos[0], dt)
+            vy = self.pid_y.compute(pos[1], dt)
+            vz = self.pid_z.compute(pos[2], dt)
+
+            # Integrar las velocidades para obtener la nueva posición de comando
+            new_pos = pos + np.array([vx, vy, vz]) * dt
+
+            # Publicar el comando de posición
             pose_msg = PoseStamped()
             pose_msg.header.frame_id = "world"
             pose_msg.header.stamp = rospy.Time.now()
@@ -143,17 +191,15 @@ class DroneNavigator:
         return trajectory
 
     # =============================================================================
-    # Método para mostrar un corte en el plano XY a la altura actual del UAV, con
-    # el campo potencial calculado siguiendo el modelo del ejemplo:
-    #
-    #   - Se usa un mapa de contornos de la magnitud de la fuerza.
-    #   - Se superpone el campo vectorial (flechas) calculado con los métodos:
-    #       f_attract y f_repulsive (basados en la distribución del ejemplo).
-    #   - Se dibujan los obstáculos (si intersecan el slice).
-    #   - Se marca el objetivo (punto magenta) y la posición actual del UAV (punto azul).
+    # Método para representar en 2D un corte en el plano XY (a la altura actual del UAV)
+    # con el campo potencial calculado siguiendo el ejemplo:
+    #   - Mapa de contornos de la magnitud de la fuerza.
+    #   - Campo vectorial (flechas) calculado según el modelo del ejemplo.
+    #   - Obstáculos (dibujados como rectángulos) que intersecan el slice.
+    #   - Objetivo (punto magenta) y posición actual del UAV (punto azul).
     # =============================================================================
     def display_force_field_slice(self, goal, pos_stuck):
-        # Parámetros para el cálculo del campo (según el ejemplo)
+        # Parámetros para el cálculo del campo (modelo del ejemplo)
         m_goal = 1.0    # constante de atracción
         R_soi = 3.0     # radio de influencia de la repulsión
 
@@ -165,7 +211,7 @@ class DroneNavigator:
         y_vals = np.linspace(y_min, y_max, num_points)
         X, Y = np.meshgrid(x_vals, y_vals)
 
-        # --- Definición de funciones locales (idénticas al ejemplo) ---
+        # --- Funciones locales (idénticas al ejemplo) ---
         def closest_point_on_box(point, center, size):
             half = size / 2.0
             lower = center - half
@@ -219,11 +265,11 @@ class DroneNavigator:
         # Mapa de contornos de la magnitud del campo
         contour = plt.contourf(X, Y, M_force, alpha=0.6, cmap='viridis')
         plt.colorbar(contour, label='Magnitud de la fuerza')
-        # Superponer el campo vectorial (flechas)
+        # Campo vectorial (flechas)
         plt.quiver(X, Y, U, V, color='white')
 
         ax = plt.gca()
-        # Dibujar los obstáculos que intersectan el slice (z = z_level)
+        # Dibujar obstáculos que intersectan el slice (z = z_level)
         for obs in self.obstacles:
             center = np.array(obs["pose"])
             size = np.array(obs["size"])
@@ -254,7 +300,7 @@ class DroneNavigator:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        # Graficar los obstáculos (como cajas)
+        # Graficar obstáculos (como cajas)
         for obs in self.obstacles:
             center = obs["pose"]
             size = obs["size"]
@@ -280,8 +326,8 @@ class DroneNavigator:
     # =============================================================================
     # Método principal que orquesta el proceso:
     #   1. Obtiene la posición actual (inicio).
-    #   2. Solicita al usuario el objetivo.
-    #   3. Ejecuta la navegación basada en campos potenciales.
+    #   2. Solicita el objetivo.
+    #   3. Ejecuta la navegación basada en campos potenciales (usando PID).
     #   4. Si se alcanza la meta o se detecta un mínimo local, muestra el gráfico interactivo.
     # =============================================================================
     def plan_and_navigate(self):
@@ -298,7 +344,7 @@ class DroneNavigator:
                 continue
 
             rospy.loginfo(f"Meta recibida: {goal}")
-            rospy.loginfo("Iniciando navegación con campos potenciales...")
+            rospy.loginfo("Iniciando navegación con campos potenciales y control PID...")
             trajectory = self.potential_field_navigation(goal)
             rospy.loginfo("Navegación completada. Mostrando la trayectoria en 3D...")
             self.display_route_plot(trajectory, start, goal)
