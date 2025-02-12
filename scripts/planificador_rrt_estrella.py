@@ -11,6 +11,7 @@ import random
 import os
 import matplotlib
 matplotlib.use('Agg')  # Para entornos sin interfaz gráfica
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from datetime import datetime
 
