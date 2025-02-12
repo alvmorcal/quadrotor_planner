@@ -108,7 +108,7 @@ def plot_box(ax, center, size, color='r', alpha=0.3):
 # -------------------------------
 
 if __name__ == '__main__':
-    bounds, obstacles = load_map("rrt_input.json")
+    bounds, obstacles = load_map("world.json")
     mode = input("¿Quieres la representación en 2D o 3D? (escribe '2D' o '3D'): ").strip().upper()
     z_slice = float(input("Introduce la altura Z para la vista 2D: ")) if mode == "2D" else None
     goal = np.array([8, 8, 0])
