@@ -19,26 +19,6 @@ from datetime import datetime
 plt.ion()
 
 # =============================================================================
-# Clase PID (opcional en este caso, ya que el control se realiza directamente
-# mediante la integración de las fuerzas potenciales; se deja aquí por estructura)
-# =============================================================================
-class PID:
-    def __init__(self, kp, ki, kd, setpoint=0):
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
-        self.setpoint = setpoint
-        self.last_error = 0
-        self.integral = 0
-
-    def compute(self, current_value, dt):
-        error = self.setpoint - current_value
-        self.integral += error * dt
-        derivative = (error - self.last_error) / dt if dt > 0 else 0
-        self.last_error = error
-        return self.kp * error + self.ki * self.integral + self.kd * derivative
-
-# =============================================================================
 # Clase DroneNavigator
 # -----------------------------------------------------------------------------
 # Esta clase se encarga de comunicarse con ROS (publicar y suscribirse a la 
@@ -54,11 +34,6 @@ class DroneNavigator:
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
-        # Los controladores PID no se usan en esta implementación, pero se dejan para mantener
-        # una estructura similar al script anterior.
-        self.pid_x = PID(2.0, 0.01, 0.8)
-        self.pid_y = PID(2.0, 0.01, 0.8)
-        self.pid_z = PID(3.0, 0.05, 1.2)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
