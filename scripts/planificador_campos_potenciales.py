@@ -57,9 +57,9 @@ class DroneNavigator:
 
         # Inicializamos los controladores PID para cada eje.
         # Estos parámetros se pueden ajustar según la respuesta deseada.
-        self.pid_x = PID(2.0, 0.01, 0.8)
-        self.pid_y = PID(2.0, 0.01, 0.8)
-        self.pid_z = PID(3.0, 0.05, 1.2)
+        self.pid_x = PID(3.0, 0.01, 1)
+        self.pid_y = PID(3.0, 0.01, 1)
+        self.pid_z = PID(4.0, 0.05, 1.5)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -100,7 +100,7 @@ class DroneNavigator:
         # Parámetros para la navegación por campos potenciales
         k_att = 2.0   # coeficiente de atracción
         k_rep = 2.0   # coeficiente de repulsión
-        d0 = 4.0      # distancia de influencia de los obstáculos
+        d0 = 3.0      # distancia de influencia de los obstáculos
         dt = 0.1      # intervalo de tiempo
 
         # Parámetros para la detección de mínimos locales
