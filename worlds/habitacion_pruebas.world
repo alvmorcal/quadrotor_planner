@@ -21,7 +21,7 @@
     <model name="room">
       <static>true</static>
       <link name="link">
-        <!-- Suelo (se mantiene igual) -->
+        <!-- Suelo -->
         <collision name="floor_collision">
           <geometry>
             <box>
@@ -42,14 +42,15 @@
               <name>Gazebo/Grey</name>
             </script>
           </material>
+          <transparency>0.5</transparency>
           <pose>0 0 -0.05 0 0 0</pose>
         </visual>
 
-        <!-- Paredes exteriores (se han modificado para ser morado pastel) -->
+        <!-- Paredes exteriores (transparencia y grosor 0.1, color morado pastel) -->
         <collision name="wall_1_collision">
           <geometry>
             <box>
-              <size>20 1 20</size>
+              <size>20 0.1 20</size>
             </box>
           </geometry>
           <pose>0 10 10 0 0 0</pose>
@@ -57,20 +58,21 @@
         <visual name="wall_1_visual">
           <geometry>
             <box>
-              <size>20 1 20</size>
+              <size>20 0.1 20</size>
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>0 10 10 0 0 0</pose>
         </visual>
 
         <collision name="wall_2_collision">
           <geometry>
             <box>
-              <size>20 1 20</size>
+              <size>20 0.1 20</size>
             </box>
           </geometry>
           <pose>0 -10 10 0 0 0</pose>
@@ -78,20 +80,21 @@
         <visual name="wall_2_visual">
           <geometry>
             <box>
-              <size>20 1 20</size>
+              <size>20 0.1 20</size>
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>0 -10 10 0 0 0</pose>
         </visual>
 
         <collision name="wall_3_collision">
           <geometry>
             <box>
-              <size>1 20 20</size>
+              <size>0.1 20 20</size>
             </box>
           </geometry>
           <pose>10 0 10 0 0 0</pose>
@@ -99,20 +102,21 @@
         <visual name="wall_3_visual">
           <geometry>
             <box>
-              <size>1 20 20</size>
+              <size>0.1 20 20</size>
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>10 0 10 0 0 0</pose>
         </visual>
 
         <collision name="wall_4_collision">
           <geometry>
             <box>
-              <size>1 20 20</size>
+              <size>0.1 20 20</size>
             </box>
           </geometry>
           <pose>-10 0 10 0 0 0</pose>
@@ -120,19 +124,20 @@
         <visual name="wall_4_visual">
           <geometry>
             <box>
-              <size>1 20 20</size>
+              <size>0.1 20 20</size>
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>-10 0 10 0 0 0</pose>
         </visual>
       </link>
     </model>
 
-    <!-- Pared interna apoyada en el suelo (paredes en morado pastel) -->
+    <!-- Pared interna apoyada en el suelo -->
     <model name="ground_wall_with_openings">
       <static>true</static>
       <link name="link">
@@ -152,9 +157,10 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>-3 -7 5 0 0 0</pose>
         </visual>
         
@@ -173,9 +179,10 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>-3 -7 15 0 0 0</pose>
         </visual>
         
@@ -194,9 +201,10 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>0 -4 15 0 0 0</pose>
         </visual>
         <collision name="wall_left4">
@@ -214,15 +222,16 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>0 -4 5 0 0 0</pose>
         </visual>
       </link>
     </model>
 
-    <!-- Pared interna apoyada en el techo (paredes en morado pastel) -->
+    <!-- Pared interna apoyada en el techo -->
     <model name="ceiling_wall_with_openings">
       <static>true</static>
       <link name="link">
@@ -241,9 +250,10 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>1.5 6 15 0 0 0</pose>
         </visual>
         
@@ -262,9 +272,10 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>1.5 6 2.5 0 0 0</pose>
         </visual>
         
@@ -283,15 +294,16 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 1</ambient>
-            <diffuse>0.8 0.6 0.8 1</diffuse>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>1.5 4 7.5 0 0 0</pose>
         </visual>
       </link>
     </model>
 
-    <!-- Columnas (se pintan en azul pastel) -->
+    <!-- Columnas (color azul pastel con transparencia) -->
     <model name="ceiling_column">
       <static>true</static>
       <link name="link">
@@ -312,9 +324,10 @@
             </cylinder>
           </geometry>
           <material>
-            <ambient>0.6 0.8 1 1</ambient>
-            <diffuse>0.6 0.8 1 1</diffuse>
+            <ambient>0.6 0.8 1 0.5</ambient>
+            <diffuse>0.6 0.8 1 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>-4 2 14 0 0 0</pose>
         </visual>
       </link>
@@ -340,15 +353,16 @@
             </cylinder>
           </geometry>
           <material>
-            <ambient>0.6 0.8 1 1</ambient>
-            <diffuse>0.6 0.8 1 1</diffuse>
+            <ambient>0.6 0.8 1 0.5</ambient>
+            <diffuse>0.6 0.8 1 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>5 0 6 0 0 0</pose>
         </visual>
       </link>
     </model>
 
-    <!-- Esferas adicionales (se pintan en naranja pastel) -->
+    <!-- Esferas adicionales (color naranja pastel con transparencia) -->
     <model name="sphere_1">
       <static>true</static>
       <link name="link">
@@ -367,9 +381,10 @@
             </sphere>
           </geometry>
           <material>
-            <ambient>1 0.8 0.6 1</ambient>
-            <diffuse>1 0.8 0.6 1</diffuse>
+            <ambient>1 0.8 0.6 0.5</ambient>
+            <diffuse>1 0.8 0.6 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>-4 6 8 0 0 0</pose>
         </visual>
       </link>
@@ -393,9 +408,10 @@
             </sphere>
           </geometry>
           <material>
-            <ambient>1 0.8 0.6 1</ambient>
-            <diffuse>1 0.8 0.6 1</diffuse>
+            <ambient>1 0.8 0.6 0.5</ambient>
+            <diffuse>1 0.8 0.6 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>7 -6 10 0 0 0</pose>
         </visual>
       </link>
@@ -419,15 +435,16 @@
             </sphere>
           </geometry>
           <material>
-            <ambient>1 0.8 0.6 1</ambient>
-            <diffuse>1 0.8 0.6 1</diffuse>
+            <ambient>1 0.8 0.6 0.5</ambient>
+            <diffuse>1 0.8 0.6 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>6 5 3 0 0 0</pose>
         </visual>
       </link>
     </model>
     
-    <!-- Cubos adicionales (se pintan en verde pastel) -->
+    <!-- Cubos adicionales (color verde pastel con transparencia) -->
     <model name="cube_1">
       <static>true</static>
       <link name="link">
@@ -446,9 +463,10 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.6 1 0.6 1</ambient>
-            <diffuse>0.6 1 0.6 1</diffuse>
+            <ambient>0.6 1 0.6 0.5</ambient>
+            <diffuse>0.6 1 0.6 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>6 4 14 0 0 0</pose>
         </visual>
       </link>
@@ -472,9 +490,10 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.6 1 0.6 1</ambient>
-            <diffuse>0.6 1 0.6 1</diffuse>
+            <ambient>0.6 1 0.6 0.5</ambient>
+            <diffuse>0.6 1 0.6 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>-6 -4 12 0 0 0</pose>
         </visual>
       </link>
@@ -498,15 +517,17 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.6 1 0.6 1</ambient>
-            <diffuse>0.6 1 0.6 1</diffuse>
+            <ambient>0.6 1 0.6 0.5</ambient>
+            <diffuse>0.6 1 0.6 0.5</diffuse>
           </material>
+          <transparency>0.5</transparency>
           <pose>-7 0 4 0 0 0</pose>
         </visual>
       </link>
     </model>
   </world>
 </sdf>
+
 
 
 
