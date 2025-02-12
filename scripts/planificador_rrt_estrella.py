@@ -119,27 +119,6 @@ class RRTStar:
         return smoothed_path
 
 # =============================================================================
-# Clase PID
-# -----------------------------------------------------------------------------
-# Controlador PID para cada eje (X, Y, Z) del dron.
-# =============================================================================
-class PID:
-    def __init__(self, kp, ki, kd, setpoint=0):
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
-        self.setpoint = setpoint
-        self.last_error = 0
-        self.integral = 0
-
-    def compute(self, current_value, dt):
-        error = self.setpoint - current_value
-        self.integral += error * dt
-        derivative = (error - self.last_error) / dt if dt > 0 else 0
-        self.last_error = error
-        return self.kp * error + self.ki * self.integral + self.kd * derivative
-
-# =============================================================================
 # Clase DroneNavigator
 # -----------------------------------------------------------------------------
 # Gestiona la comunicación con ROS, la navegación del dron y la visualización
@@ -154,9 +133,6 @@ class DroneNavigator:
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
-        self.pid_x = PID(2.0, 0.01, 0.8)
-        self.pid_y = PID(2.0, 0.01, 0.8)
-        self.pid_z = PID(3.0, 0.05, 1.2)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -183,14 +159,11 @@ class DroneNavigator:
 
     def move_to_waypoints(self, waypoints):
         rospy.loginfo("Iniciando movimiento hacia los waypoints...")
-        for i, waypoint in enumerate(waypoints):
+        proximity_radius = 0.3  # Radio de proximidad para considerar alcanzado un waypoint
+        for waypoint in waypoints:
             if rospy.is_shutdown():
                 break
-            # Se establece proximity_radius en 0.3 para todos los waypoints
-            proximity_radius = 0.3
-            self.pid_x.setpoint = waypoint[0]
-            self.pid_y.setpoint = waypoint[1]
-            self.pid_z.setpoint = waypoint[2]
+            rospy.loginfo(f"Moviendo hacia waypoint: {waypoint}")
             while not rospy.is_shutdown():
                 if self.current_pose is None:
                     rospy.logwarn("Esperando datos de la posición actual...")
@@ -202,19 +175,19 @@ class DroneNavigator:
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
                     break
-                dt = 0.1
-                vx = self.pid_x.compute(self.current_pose.x, dt)
-                vy = self.pid_y.compute(self.current_pose.y, dt)
-                vz = self.pid_z.compute(self.current_pose.z, dt)
+                # Se envía directamente la posición del waypoint como comando
                 pose_msg = PoseStamped()
                 pose_msg.header.frame_id = "world"
                 pose_msg.header.stamp = rospy.Time.now()
-                pose_msg.pose.position.x = self.current_pose.x + vx * dt
-                pose_msg.pose.position.y = self.current_pose.y + vy * dt
-                pose_msg.pose.position.z = self.current_pose.z + vz * dt
+                pose_msg.pose.position.x = waypoint[0]
+                pose_msg.pose.position.y = waypoint[1]
+                pose_msg.pose.position.z = waypoint[2]
                 self.pose_pub.publish(pose_msg)
-                rospy.sleep(dt)
-        rospy.loginfo(f"Waypoints completados. Posición final: ({self.current_pose.x}, {self.current_pose.y}, {self.current_pose.z})")
+                rospy.sleep(0.1)
+        if self.current_pose is not None:
+            rospy.loginfo(f"Waypoints completados. Posición final: ({self.current_pose.x}, {self.current_pose.y}, {self.current_pose.z})")
+        else:
+            rospy.loginfo("Waypoints completados.")
 
     def display_route_plot(self, path, start, goal):
         """
@@ -312,3 +285,4 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
