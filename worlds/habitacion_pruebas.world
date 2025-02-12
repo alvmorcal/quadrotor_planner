@@ -160,7 +160,7 @@
             <ambient>0.8 0.6 0.8 0.5</ambient>
             <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>-3 -7 5 0 0 0</pose>
         </visual>
         
@@ -182,7 +182,7 @@
             <ambient>0.8 0.6 0.8 0.5</ambient>
             <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>-3 -7 15 0 0 0</pose>
         </visual>
         
@@ -204,7 +204,7 @@
             <ambient>0.8 0.6 0.8 0.5</ambient>
             <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>0 -4 15 0 0 0</pose>
         </visual>
         <collision name="wall_left4">
@@ -225,7 +225,7 @@
             <ambient>0.8 0.6 0.8 0.5</ambient>
             <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>0 -4 5 0 0 0</pose>
         </visual>
       </link>
@@ -253,7 +253,7 @@
             <ambient>0.8 0.6 0.8 0.5</ambient>
             <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>1.5 6 15 0 0 0</pose>
         </visual>
         
@@ -275,7 +275,7 @@
             <ambient>0.8 0.6 0.8 0.5</ambient>
             <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>1.5 6 2.5 0 0 0</pose>
         </visual>
         
@@ -297,7 +297,7 @@
             <ambient>0.8 0.6 0.8 0.5</ambient>
             <diffuse>0.8 0.6 0.8 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>1.5 4 7.5 0 0 0</pose>
         </visual>
       </link>
@@ -327,7 +327,7 @@
             <ambient>0.6 0.8 1 0.5</ambient>
             <diffuse>0.6 0.8 1 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>-4 2 14 0 0 0</pose>
         </visual>
       </link>
@@ -356,7 +356,7 @@
             <ambient>0.6 0.8 1 0.5</ambient>
             <diffuse>0.6 0.8 1 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>5 0 6 0 0 0</pose>
         </visual>
       </link>
@@ -384,7 +384,7 @@
             <ambient>1 0.8 0.6 0.5</ambient>
             <diffuse>1 0.8 0.6 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>-4 6 8 0 0 0</pose>
         </visual>
       </link>
@@ -396,7 +396,7 @@
         <collision name="collision">
           <geometry>
             <sphere>
-              <radius>1</radius>
+              <radius>1.5</radius>
             </sphere>
           </geometry>
           <pose>7 -6 10 0 0 0</pose>
@@ -404,14 +404,14 @@
         <visual name="visual">
           <geometry>
             <sphere>
-              <radius>1</radius>
+              <radius>1.5</radius>
             </sphere>
           </geometry>
           <material>
             <ambient>1 0.8 0.6 0.5</ambient>
             <diffuse>1 0.8 0.6 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>7 -6 10 0 0 0</pose>
         </visual>
       </link>
@@ -438,7 +438,7 @@
             <ambient>1 0.8 0.6 0.5</ambient>
             <diffuse>1 0.8 0.6 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>6 5 3 0 0 0</pose>
         </visual>
       </link>
@@ -466,7 +466,7 @@
             <ambient>0.6 1 0.6 0.5</ambient>
             <diffuse>0.6 1 0.6 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>6 4 14 0 0 0</pose>
         </visual>
       </link>
@@ -493,7 +493,7 @@
             <ambient>0.6 1 0.6 0.5</ambient>
             <diffuse>0.6 1 0.6 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>-6 -4 12 0 0 0</pose>
         </visual>
       </link>
@@ -520,7 +520,7 @@
             <ambient>0.6 1 0.6 0.5</ambient>
             <diffuse>0.6 1 0.6 0.5</diffuse>
           </material>
-          <transparency>0.7</transparency>
+          <transparency>0.3</transparency>
           <pose>-7 0 4 0 0 0</pose>
         </visual>
       </link>
