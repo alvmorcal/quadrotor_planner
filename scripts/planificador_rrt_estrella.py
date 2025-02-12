@@ -11,8 +11,8 @@ import random
 import os
 import matplotlib
 matplotlib.use('Agg')  # Para entornos sin interfaz gráfica
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # Importación necesaria para la proyección 3D
 from datetime import datetime
 
 # =============================================================================
@@ -272,7 +272,8 @@ class DroneNavigator:
 
     def save_route_plot(self, path, start, goal):
         """
-        Genera y guarda una figura 3D con la trayectoria seguida, marcando el punto de inicio y el final.
+        Genera y guarda una figura 3D con la trayectoria seguida, marcando el punto de inicio y el final,
+        e incluyendo el mapa (los obstáculos).
         La figura se guarda en la carpeta 'rutas_rrt_estrella' con el nombre basado en la fecha y hora actual.
         """
         folder = "rutas_rrt_estrella"
@@ -283,12 +284,27 @@ class DroneNavigator:
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
+
+        # Graficar los obstáculos (mapa)
+        for obs in self.obstacles:
+            center = obs["pose"]
+            size = obs["size"]
+            # Coordenadas de la esquina inferior izquierda del cubo
+            x0 = center[0] - size[0] / 2.0
+            y0 = center[1] - size[1] / 2.0
+            z0 = center[2] - size[2] / 2.0
+            ax.bar3d(x0, y0, z0, size[0], size[1], size[2], color="gray", alpha=0.3, shade=True)
+
+        # Graficar la trayectoria
         xs = [p[0] for p in path]
         ys = [p[1] for p in path]
         zs = [p[2] for p in path]
         ax.plot(xs, ys, zs, label="Trayectoria", color="blue", marker="o", markersize=3)
+
+        # Graficar el inicio y la meta
         ax.scatter([start[0]], [start[1]], [start[2]], color="green", s=100, label="Inicio")
         ax.scatter([goal[0]], [goal[1]], [goal[2]], color="red", s=100, label="Fin")
+
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_zlabel("Z")
@@ -304,7 +320,7 @@ class DroneNavigator:
          2. Solicita al usuario el punto objetivo (goal).
          3. Genera la ruta con RRT* y la suaviza.
          4. Navega a través de los waypoints del camino resultante.
-         5. Guarda la figura 3D de la trayectoria y vuelve a solicitar un nuevo objetivo.
+         5. Guarda la figura 3D de la trayectoria (incluyendo el mapa) y vuelve a solicitar un nuevo objetivo.
         """
         while not rospy.is_shutdown():
             start = self.get_start_position()
@@ -353,7 +369,3 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
-
-
-
-
