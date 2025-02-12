@@ -106,7 +106,414 @@
             </box>
           </geometry>
           <material>
-            <ambient>0.8 0.6 0.8 0.5</ambi
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
+          </material>
+          <transparency>0.5</transparency>
+          <pose>10 0 10 0 0 0</pose>
+        </visual>
+
+        <collision name="wall_4_collision">
+          <geometry>
+            <box>
+              <size>0.1 20 20</size>
+            </box>
+          </geometry>
+          <pose>-10 0 10 0 0 0</pose>
+        </collision>
+        <visual name="wall_4_visual">
+          <geometry>
+            <box>
+              <size>0.1 20 20</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 0.5</ambient>
+            <diffuse>0.8 0.6 0.8 0.5</diffuse>
+          </material>
+          <transparency>0.5</transparency>
+          <pose>-10 0 10 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Pared interna apoyada en el suelo (elemento interno: sin transparencia, opaco) -->
+    <model name="ground_wall_with_openings">
+      <static>true</static>
+      <link name="link">
+        <!-- Sección izquierda -->
+        <collision name="wall_left">
+          <geometry>
+            <box>
+              <size>1 6 10</size>
+            </box>
+          </geometry>
+          <pose>-3 -7 5 0 0 0</pose>
+        </collision>
+        <visual name="visual_left">
+          <geometry>
+            <box>
+              <size>1 6 10</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 1</ambient>
+            <diffuse>0.8 0.6 0.8 1</diffuse>
+          </material>
+          <!-- Se eliminó la etiqueta <transparency> -->
+          <pose>-3 -7 5 0 0 0</pose>
+        </visual>
+        
+        <collision name="wall_left3">
+          <geometry>
+            <box>
+              <size>1 6 4</size>
+            </box>
+          </geometry>
+          <pose>-3 -7 15 0 0 0</pose>
+        </collision>
+        <visual name="visual_left3">
+          <geometry>
+            <box>
+              <size>1 6 4</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 1</ambient>
+            <diffuse>0.8 0.6 0.8 1</diffuse>
+          </material>
+          <pose>-3 -7 15 0 0 0</pose>
+        </visual>
+        
+        <collision name="wall_left2">
+          <geometry>
+            <box>
+              <size>6 1 10</size>
+            </box>
+          </geometry>
+          <pose>0 -4 15 0 0 0</pose>
+        </collision>
+        <visual name="visual_left2">
+          <geometry>
+            <box>
+              <size>6 1 10</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 1</ambient>
+            <diffuse>0.8 0.6 0.8 1</diffuse>
+          </material>
+          <pose>0 -4 15 0 0 0</pose>
+        </visual>
+        <collision name="wall_left4">
+          <geometry>
+            <box>
+              <size>6 1 4</size>
+            </box>
+          </geometry>
+          <pose>0 -4 5 0 0 0</pose>
+        </collision>
+        <visual name="visual_left4">
+          <geometry>
+            <box>
+              <size>6 1 4</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 1</ambient>
+            <diffuse>0.8 0.6 0.8 1</diffuse>
+          </material>
+          <pose>0 -4 5 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Pared interna apoyada en el techo (elemento interno: sin transparencia, opaco) -->
+    <model name="ceiling_wall_with_openings">
+      <static>true</static>
+      <link name="link">
+        <collision name="wall_collision">
+          <geometry>
+            <box>
+              <size>1 8 10</size>
+            </box>
+          </geometry>
+          <pose>1.5 6 15 0 0 0</pose>
+        </collision>
+        <visual name="wall_visual">
+          <geometry>
+            <box>
+              <size>1 8 10</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 1</ambient>
+            <diffuse>0.8 0.6 0.8 1</diffuse>
+          </material>
+          <pose>1.5 6 15 0 0 0</pose>
+        </visual>
+        
+        <collision name="wall_collision2">
+          <geometry>
+            <box>
+              <size>1 8 5</size>
+            </box>
+          </geometry>
+          <pose>1.5 6 2.5 0 0 0</pose>
+        </collision>
+        <visual name="wall_visual2">
+          <geometry>
+            <box>
+              <size>1 8 5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 1</ambient>
+            <diffuse>0.8 0.6 0.8 1</diffuse>
+          </material>
+          <pose>1.5 6 2.5 0 0 0</pose>
+        </visual>
+        
+        <collision name="wall_collision3">
+          <geometry>
+            <box>
+              <size>1 4 5</size>
+            </box>
+          </geometry>
+          <pose>1.5 4 7.5 0 0 0</pose>
+        </collision>
+        <visual name="wall_visual3">
+          <geometry>
+            <box>
+              <size>1 4 5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.6 0.8 1</ambient>
+            <diffuse>0.8 0.6 0.8 1</diffuse>
+          </material>
+          <pose>1.5 4 7.5 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Columnas (elementos internos: se quita la transparencia y se vuelve opaco) -->
+    <model name="ceiling_column">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>1</radius>
+              <length>12</length>
+            </cylinder>
+          </geometry>
+          <pose>-4 2 14 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>1</radius>
+              <length>12</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.6 0.8 1 1</ambient>
+            <diffuse>0.6 0.8 1 1</diffuse>
+          </material>
+          <pose>-4 2 14 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="floor_column">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>1</radius>
+              <length>12</length>
+            </cylinder>
+          </geometry>
+          <pose>5 0 6 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>1</radius>
+              <length>12</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.6 0.8 1 1</ambient>
+            <diffuse>0.6 0.8 1 1</diffuse>
+          </material>
+          <pose>5 0 6 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Esferas adicionales (elementos internos: sin transparencia, opacas; color naranja pastel) -->
+    <model name="sphere_1">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere>
+              <radius>1</radius>
+            </sphere>
+          </geometry>
+          <pose>-4 6 8 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere>
+              <radius>1</radius>
+            </sphere>
+          </geometry>
+          <material>
+            <ambient>1 0.8 0.6 1</ambient>
+            <diffuse>1 0.8 0.6 1</diffuse>
+          </material>
+          <pose>-4 6 8 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="sphere_2">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere>
+              <radius>1.5</radius>
+            </sphere>
+          </geometry>
+          <pose>7 -6 10 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere>
+              <radius>1.5</radius>
+            </sphere>
+          </geometry>
+          <material>
+            <ambient>1 0.8 0.6 1</ambient>
+            <diffuse>1 0.8 0.6 1</diffuse>
+          </material>
+          <pose>7 -6 10 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="sphere_3">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere>
+              <radius>1.5</radius>
+            </sphere>
+          </geometry>
+          <pose>6 5 3 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere>
+              <radius>1.5</radius>
+            </sphere>
+          </geometry>
+          <material>
+            <ambient>1 0.8 0.6 1</ambient>
+            <diffuse>1 0.8 0.6 1</diffuse>
+          </material>
+          <pose>6 5 3 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+    
+    <!-- Cubos adicionales (elementos internos: sin transparencia, opacos; color verde pastel) -->
+    <model name="cube_1">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>2 2 2</size>
+            </box>
+          </geometry>
+          <pose>6 4 14 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>2 2 2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.6 1 0.6 1</ambient>
+            <diffuse>0.6 1 0.6 1</diffuse>
+          </material>
+          <pose>6 4 14 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+
+    <model name="cube_2">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>2 2 2</size>
+            </box>
+          </geometry>
+          <pose>-6 -4 12 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>2 2 2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.6 1 0.6 1</ambient>
+            <diffuse>0.6 1 0.6 1</diffuse>
+          </material>
+          <pose>-6 -4 12 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+    
+    <model name="cube_3">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>2 2 3</size>
+            </box>
+          </geometry>
+          <pose>-7 0 4 0 0 0</pose>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>2 2 3</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.6 1 0.6 1</ambient>
+            <diffuse>0.6 1 0.6 1</diffuse>
+          </material>
+          <pose>-7 0 4 0 0 0</pose>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>
+
 
 
 
