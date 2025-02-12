@@ -151,7 +151,7 @@ def plot_box(ax, center, size, color='r', alpha=0.3):
 
 if __name__ == '__main__':
     # Cargar el mapa y los obstáculos desde el archivo JSON
-    json_file = "rrt_input.json"  # Asegúrate de que esté en el mismo directorio
+    json_file = "world.json"  # Asegúrate de que esté en el mismo directorio
     bounds, obstacles = load_map(json_file)
     
     # Crear una malla 3D usando los límites del mapa
