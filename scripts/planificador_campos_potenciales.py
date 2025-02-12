@@ -89,7 +89,7 @@ class DroneNavigator:
 
         return trajectory
 
-        def display_force_field_slice(self, goal, pos_stuck, k_att, k_rep, d0):
+    def display_force_field_slice(self, goal, pos_stuck, k_att, k_rep, d0):
         """
         Representa el campo potencial en el plano XY (a la altura donde se detectó
         el mínimo local), usando un mapa de contornos de la magnitud de la fuerza y
