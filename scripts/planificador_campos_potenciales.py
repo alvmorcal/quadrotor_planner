@@ -3,7 +3,7 @@
 import rospy
 import json
 import numpy as np
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Twist  # Para publicar velocidades
 from nav_msgs.msg import Odometry
 import subprocess
 import matplotlib
@@ -43,23 +43,25 @@ class PID:
 # -----------------------------------------------------------------------------
 # Se encarga de comunicarse con ROS, activar los motores, leer la posición
 # actual y navegar usando campos potenciales. Se detectan mínimos locales y se
-# comanda al dron utilizando un controlador PID para cada eje.
+# comanda al dron utilizando un controlador PID para cada eje, publicando
+# comandos de velocidad (Twist).
 # =============================================================================
 class DroneNavigator:
     def __init__(self, bounds, obstacles):
         rospy.init_node('drone_navigator', anonymous=True)
         self.bounds = bounds
         self.obstacles = obstacles
-        self.pose_pub = rospy.Publisher('/command/pose', PoseStamped, queue_size=10)
+        # Publicador de Twist para enviar comandos de velocidad
+        self.vel_pub = rospy.Publisher('/command/twist', Twist, queue_size=10)
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
 
         # Inicializamos los controladores PID para cada eje.
         # Estos parámetros se pueden ajustar según la respuesta deseada.
-        self.pid_x = PID(3.0, 0.01, 1)
-        self.pid_y = PID(3.0, 0.01, 1)
-        self.pid_z = PID(4.0, 0.05, 1.5)
+        self.pid_x = PID(2.0, 0.01, 0.8)
+        self.pid_y = PID(2.0, 0.01, 0.8)
+        self.pid_z = PID(3.0, 0.05, 1.2)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -86,26 +88,24 @@ class DroneNavigator:
 
     # =============================================================================
     # Método de navegación basado en campos potenciales con PID para comandar
-    # las velocidades.
+    # las velocidades (publicando Twist).
     #
     # En cada iteración:
-    #   - Se calcula la fuerza atractiva y repulsiva para obtener el vector total.
-    #   - Se define una posición deseada (current + F_total * dt).
-    #   - Se actualizan los setpoints de cada PID.
-    #   - Se calculan las velocidades que corrigen el error entre la posición actual
-    #     y el setpoint.
-    #   - Se integra la velocidad para generar el nuevo comando de posición.
+    #   - Se calcula la fuerza resultante (atractiva + repulsiva).
+    #   - Se define una posición deseada (actual + F_total * dt).
+    #   - Se actualizan los setpoints de cada PID y se calculan las velocidades.
+    #   - Se publica un mensaje Twist con esas velocidades.
     # =============================================================================
     def potential_field_navigation(self, goal):
         # Parámetros para la navegación por campos potenciales
-        k_att = 3.0   # coeficiente de atracción
-        k_rep = 3.0   # coeficiente de repulsión
-        d0 = 5.0      # distancia de influencia de los obstáculos
+        k_att = 1.0   # coeficiente de atracción
+        k_rep = 2.0   # coeficiente de repulsión
+        d0 = 2.0      # distancia de influencia de los obstáculos
         dt = 0.1      # intervalo de tiempo
 
         # Parámetros para la detección de mínimos locales
-        epsilon_force = 0.1       # umbral de fuerza para considerar que hay un mínimo local
-        local_min_threshold = 10   # número de iteraciones consecutivas con fuerza muy pequeña
+        epsilon_force = 0.01       # umbral para considerar que hay un mínimo local
+        local_min_threshold = 50   # iteraciones consecutivas con fuerza muy pequeña
         local_min_counter = 0
 
         trajectory = []  # almacena la trayectoria seguida
@@ -174,17 +174,16 @@ class DroneNavigator:
             vy = self.pid_y.compute(pos[1], dt)
             vz = self.pid_z.compute(pos[2], dt)
 
-            # Integrar las velocidades para obtener la nueva posición de comando
-            new_pos = pos + np.array([vx, vy, vz]) * dt
-
-            # Publicar el comando de posición
-            pose_msg = PoseStamped()
-            pose_msg.header.frame_id = "world"
-            pose_msg.header.stamp = rospy.Time.now()
-            pose_msg.pose.position.x = new_pos[0]
-            pose_msg.pose.position.y = new_pos[1]
-            pose_msg.pose.position.z = new_pos[2]
-            self.pose_pub.publish(pose_msg)
+            # Publicar el comando de velocidad usando Twist
+            twist_msg = Twist()
+            twist_msg.linear.x = vx
+            twist_msg.linear.y = vy
+            twist_msg.linear.z = vz
+            # No se envían comandos de velocidad angular en este ejemplo
+            twist_msg.angular.x = 0
+            twist_msg.angular.y = 0
+            twist_msg.angular.z = 0
+            self.vel_pub.publish(twist_msg)
 
             rospy.sleep(dt)
 
@@ -192,9 +191,9 @@ class DroneNavigator:
 
     # =============================================================================
     # Método para representar en 2D un corte en el plano XY (a la altura actual del UAV)
-    # con el campo potencial calculado siguiendo el ejemplo:
+    # con el campo potencial calculado siguiendo el modelo del ejemplo:
     #   - Mapa de contornos de la magnitud de la fuerza.
-    #   - Campo vectorial (flechas) calculado según el modelo del ejemplo.
+    #   - Campo vectorial (flechas) calculado según el modelo.
     #   - Obstáculos (dibujados como rectángulos) que intersecan el slice.
     #   - Objetivo (punto magenta) y posición actual del UAV (punto azul).
     # =============================================================================
@@ -344,7 +343,7 @@ class DroneNavigator:
                 continue
 
             rospy.loginfo(f"Meta recibida: {goal}")
-            rospy.loginfo("Iniciando navegación con campos potenciales y control PID...")
+            rospy.loginfo("Iniciando navegación con campos potenciales y control PID (publicando Twist)...")
             trajectory = self.potential_field_navigation(goal)
             rospy.loginfo("Navegación completada. Mostrando la trayectoria en 3D...")
             self.display_route_plot(trajectory, start, goal)
@@ -371,6 +370,7 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
 
