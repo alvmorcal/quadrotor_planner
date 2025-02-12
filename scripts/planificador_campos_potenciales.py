@@ -89,26 +89,36 @@ class DroneNavigator:
 
         return trajectory
 
-    def display_force_field_slice(self, goal, pos_stuck, k_att, k_rep, d0):
+        def display_force_field_slice(self, goal, pos_stuck, k_att, k_rep, d0):
+        """
+        Representa el campo potencial en el plano XY (a la altura donde se detectó
+        el mínimo local), usando un mapa de contornos de la magnitud de la fuerza y
+        superponiendo el campo vectorial. Además, dibuja los obstáculos (si intersecan
+        con el slice) y marca el objetivo.
+        """
+        from matplotlib.patches import Rectangle
+
         z_level = pos_stuck[2]
         x_min, x_max = self.bounds["x"]
         y_min, y_max = self.bounds["y"]
-        grid_points = 30
+        grid_points = 30  # Mayor resolución para la malla
         x_vals = np.linspace(x_min, x_max, grid_points)
         y_vals = np.linspace(y_min, y_max, grid_points)
         grid_x, grid_y = np.meshgrid(x_vals, y_vals)
 
         F_total_x = np.zeros_like(grid_x)
         F_total_y = np.zeros_like(grid_y)
-        F_magnitude = np.zeros_like(grid_x)
+        M_force = np.zeros_like(grid_x)
         goal_np = np.array(goal)
 
+        # Calcular el campo potencial en cada punto de la malla
         for i in range(grid_x.shape[0]):
             for j in range(grid_x.shape[1]):
                 point = np.array([grid_x[i, j], grid_y[i, j], z_level])
+                # Fuerza atractiva (potencial cuadrático)
                 F_att = -k_att * (point - goal_np)
+                # Fuerza repulsiva: se suma la contribución de cada obstáculo
                 F_rep_total = np.array([0.0, 0.0, 0.0])
-
                 for obs in self.obstacles:
                     obs_center = np.array(obs["pose"])
                     size = np.array(obs["size"])
@@ -123,29 +133,41 @@ class DroneNavigator:
                             diff = point - obs_center
                         F_rep = k_rep * (1.0/d - 1.0/d0) / (d**2) * (diff / d)
                         F_rep_total += F_rep
-
                 F_total = F_att + F_rep_total
                 F_total_x[i, j] = F_total[0]
                 F_total_y[i, j] = F_total[1]
-                F_magnitude[i, j] = np.linalg.norm(F_total)
+                M_force[i, j] = np.linalg.norm(F_total)
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-        contour = ax.contourf(grid_x, grid_y, F_magnitude, cmap="viridis")
-        plt.colorbar(contour, label="Magnitud de la fuerza")
-        ax.quiver(grid_x, grid_y, F_total_x, F_total_y, color="white", alpha=0.7)
+        # Crear la figura con un tamaño adecuado
+        plt.figure(figsize=(8, 6))
+        # Mapa de contornos de la magnitud del campo potencial
+        contour = plt.contourf(grid_x, grid_y, M_force, alpha=0.6, cmap='viridis')
+        plt.colorbar(contour, label='Magnitud de la fuerza')
+        # Superponer el campo vectorial (quiver)
+        plt.quiver(grid_x, grid_y, F_total_x, F_total_y, color='white')
 
+        # Dibujar los obstáculos que intersecan con el slice (z = z_level)
+        ax = plt.gca()
         for obs in self.obstacles:
-            obs_center = obs["pose"]
-            size = obs["size"]
-            rect = patches.Rectangle((obs_center[0] - size[0]/2, obs_center[1] - size[1]/2),
-                                     size[0], size[1], linewidth=1.5, edgecolor='red', facecolor='none')
-            ax.add_patch(rect)
+            obs_center = np.array(obs["pose"])
+            size = np.array(obs["size"])
+            z_min_obs = obs_center[2] - size[2] / 2.0
+            z_max_obs = obs_center[2] + size[2] / 2.0
+            if z_level >= z_min_obs and z_level <= z_max_obs:
+                x_obs = obs_center[0] - size[0] / 2.0
+                y_obs = obs_center[1] - size[1] / 2.0
+                rect = Rectangle((x_obs, y_obs), size[0], size[1],
+                                 linewidth=1, edgecolor='r', facecolor='none', alpha=0.8)
+                ax.add_patch(rect)
 
-        ax.scatter(goal[0], goal[1], color="magenta", s=100, label="Objetivo")
-        ax.legend()
-        ax.set_title(f"Campo Potencial en el plano x-y (z = {z_level:.2f})")
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
+        # Marcar el objetivo
+        plt.plot(goal[0], goal[1], 'mo', markersize=8, label='Objetivo')
+        plt.title("Campo Potencial en el plano XY a z = {:.2f}".format(z_level))
+        plt.xlabel("X")
+        plt.ylabel("Y")
+        plt.legend()
+        plt.xlim(x_min, x_max)
+        plt.ylim(y_min, y_max)
         plt.show()
 
     def plan_and_navigate(self):
