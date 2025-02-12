@@ -57,7 +57,7 @@ class RRTStar:
         for obs in self.obstacles:
             x, y, z = obs["pose"]
             size_x, size_y, size_z = obs["size"]
-            # Chequear si el punto (point[0], point[1], point[2]) está dentro del volumen del obstáculo con un margen de seguridad
+            # Chequear si el punto está dentro del volumen del obstáculo con un margen de seguridad
             if (x - size_x / 2 - safety_distance <= point[0] <= x + size_x / 2 + safety_distance and
                 y - size_y / 2 - safety_distance <= point[1] <= y + size_y / 2 + safety_distance and
                 z - size_z / 2 - safety_distance <= point[2] <= z + size_z / 2 + safety_distance):
@@ -141,7 +141,7 @@ class RRTStar:
                     return self.reconstruct_path()
 
         # Si no se logra encontrar un camino, se imprime un mensaje
-        print("No se encontró un camino válido")
+        rospy.logwarn("No se encontró un camino válido")
         return []
 
     def reconstruct_path(self):
@@ -302,8 +302,8 @@ class DroneNavigator:
             if rospy.is_shutdown():
                 break
 
-            # Definir un radio de proximidad dependiendo de si es el último waypoint (más pequeño)
-            proximity_radius = 0.2 if i == len(waypoints) - 1 else 0.3
+            # Definir un radio de proximidad (más pequeño para el último waypoint)
+            proximity_radius = 0.3
 
             # Configurar los setpoints para cada eje
             self.pid_x.setpoint = waypoint[0]
@@ -311,18 +311,18 @@ class DroneNavigator:
             self.pid_z.setpoint = waypoint[2]
 
             while not rospy.is_shutdown():
-                # Verifica que tengamos información de la pose actual
+                # Verificar que se tenga información de la pose actual
                 if self.current_pose is None:
                     rospy.logwarn("Esperando datos de la posición actual...")
                     rospy.sleep(0.1)
                     continue
 
-                # Calcular distancia al waypoint
+                # Calcular la distancia al waypoint
                 current_position = np.array([self.current_pose.x, self.current_pose.y, self.current_pose.z])
                 waypoint_position = np.array(waypoint)
                 distance = np.linalg.norm(current_position - waypoint_position)
 
-                # Si estamos dentro del radio de proximidad, pasamos al siguiente waypoint
+                # Si estamos dentro del radio de proximidad, pasar al siguiente waypoint
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
                     break
@@ -342,48 +342,54 @@ class DroneNavigator:
                 pose_msg.pose.position.z = self.current_pose.z + vz * dt
                 self.pose_pub.publish(pose_msg)
 
-                # Esperar el tiempo dt antes de la siguiente iteración
                 rospy.sleep(dt)
 
-        # Al finalizar todos los waypoints, se registra la posición final
         rospy.loginfo(f"Waypoints completados. Posición final: ({self.current_pose.x}, {self.current_pose.y}, {self.current_pose.z})")
 
     def plan_and_navigate(self):
         """
         Orquesta el proceso de planificación y navegación:
-         1. Determina punto de inicio.
-         2. Pide al usuario el punto objetivo (goal).
+         1. Obtiene la posición actual (inicio).
+         2. Solicita al usuario el punto objetivo (goal).
          3. Genera la ruta con RRT* y la suaviza.
          4. Navega a través de los waypoints del camino resultante.
+         5. Al finalizar, vuelve a solicitar un nuevo objetivo.
         """
-        # Obtener la posición de inicio
-        start = self.get_start_position()
-        # Leer la meta por consola
-        goal = (
-            float(input("Ingrese X: ")),
-            float(input("Ingrese Y: ")),
-            float(input("Ingrese Z: "))
-        )
+        while not rospy.is_shutdown():
+            # Obtener la posición de inicio (la posición actual del dron)
+            start = self.get_start_position()
 
-        rospy.loginfo(f"Meta recibida: {goal}")
+            # Leer la meta por consola
+            try:
+                goal = (
+                    float(input("Ingrese la coordenada X del nuevo objetivo: ")),
+                    float(input("Ingrese la coordenada Y del nuevo objetivo: ")),
+                    float(input("Ingrese la coordenada Z del nuevo objetivo: "))
+                )
+            except ValueError:
+                rospy.logerr("Valores ingresados inválidos. Intente nuevamente.")
+                continue
 
-        # Instanciar el planeador RRTStar
-        rrt_star = RRTStar(start=start, goal=goal, bounds=self.bounds, obstacles=self.obstacles)
+            rospy.loginfo(f"Meta recibida: {goal}")
 
-        rospy.loginfo("Planeando ruta con RRT*...")
-        path = rrt_star.find_path()
+            # Instanciar el planeador RRTStar
+            rrt_star = RRTStar(start=start, goal=goal, bounds=self.bounds, obstacles=self.obstacles)
 
-        # Verificar si se encontró ruta
-        if not path:
-            rospy.logerr("No se pudo encontrar una ruta válida.")
-            return
+            rospy.loginfo("Planeando ruta con RRT*...")
+            path = rrt_star.find_path()
 
-        rospy.loginfo("Ruta encontrada. Suavizando...")
-        smoothed_path = rrt_star.smooth_path(path)
+            # Verificar si se encontró una ruta
+            if not path:
+                rospy.logerr("No se pudo encontrar una ruta válida. Intente con otro objetivo.")
+                continue
 
-        rospy.loginfo("Iniciando navegación...")
-        self.move_to_waypoints(smoothed_path)
+            rospy.loginfo("Ruta encontrada. Suavizando...")
+            smoothed_path = rrt_star.smooth_path(path)
 
+            rospy.loginfo("Iniciando navegación hacia el objetivo...")
+            self.move_to_waypoints(smoothed_path)
+
+            rospy.loginfo("Objetivo alcanzado. Puede ingresar un nuevo objetivo.\n")
 
 # =============================================================================
 # Main del script
@@ -411,9 +417,10 @@ if __name__ == '__main__':
         # Activar motores
         navigator.activate_motors()
 
-        # Iniciar planificación y navegación
+        # Iniciar el ciclo de planificación y navegación (se repetirá hasta que se interrumpa la ejecución)
         navigator.plan_and_navigate()
 
     except rospy.ROSInterruptException:
         pass
+
 
