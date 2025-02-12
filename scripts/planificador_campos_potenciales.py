@@ -96,7 +96,7 @@ class DroneNavigator:
     def potential_field_navigation(self, goal):
         # Parámetros de los campos potenciales
         k_att = 1.0   # coeficiente de atracción
-        k_rep = 1.0   # coeficiente de repulsión
+        k_rep = 2.0   # coeficiente de repulsión
         d0 = 2.0      # distancia de influencia de los obstáculos
         dt = 0.1      # paso de tiempo
 
