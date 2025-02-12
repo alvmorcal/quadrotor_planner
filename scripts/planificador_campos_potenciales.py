@@ -96,13 +96,25 @@ class DroneNavigator:
             # Fuerza repulsiva: suma sobre todos los obstáculos
             F_rep_total = np.array([0.0, 0.0, 0.0])
             for obs in self.obstacles:
+                # Obtenemos el centro y las dimensiones
                 obs_center = np.array(obs["pose"])
-                diff = pos - obs_center
+                size = np.array(obs["size"])
+                # Calculamos la esquina inferior (mínima) y la superior (máxima) del obstáculo
+                min_corner = obs_center - size / 2.0
+                max_corner = obs_center + size / 2.0
+                # Calculamos el punto más cercano en la caja al dron
+                closest_point = np.clip(pos, min_corner, max_corner)
+                diff = pos - closest_point
                 d = np.linalg.norm(diff)
-                if d < d0 and d > 0:
-                    # Fórmula clásica: F_rep = k_rep*(1/d - 1/d0)*(1/d^2)*(diff/d)
+                if d < d0:
+                    # Si d es cero (o muy pequeño), asignamos un epsilon para evitar división por cero
+                    if d == 0:
+                        d = 0.001
+                        # En este caso, podemos tomar la dirección como la que va desde el centro del obstáculo al dron
+                        diff = pos - obs_center
                     F_rep = k_rep * (1.0/d - 1.0/d0) / (d**2) * (diff / d)
                     F_rep_total += F_rep
+
 
             # Fuerza total (suma de atractiva y repulsiva)
             F_total = F_att + F_rep_total
