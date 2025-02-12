@@ -344,7 +344,7 @@ if __name__ == '__main__':
     try:
         # Definir límites para la visualización
         bounds = {"x": [-10, 10], "y": [-10, 10], "z": [0, 20]}
-        with open("rrt_input.json", "r") as f:
+        with open("world.json", "r") as f:
             obstacles = json.load(f)["obstacles"]
         
         navigator = DroneNavigator(bounds, obstacles)
