@@ -7,10 +7,10 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 import subprocess
 import matplotlib
-# Usar backend interactivo (asegúrate de tener PyQt5 instalado)
+# Usar backend interactivo (asegúrate de tener instalado PyQt5)
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # Para la proyección 3D
+from mpl_toolkits.mplot3d import Axes3D  # Para proyección 3D
 from matplotlib.patches import Rectangle
 from datetime import datetime
 
@@ -20,10 +20,11 @@ plt.ion()
 # =============================================================================
 # Clase DroneNavigator
 # -----------------------------------------------------------------------------
-# Esta clase se encarga de comunicarse con ROS (publicar y suscribirse a la 
-# posición), activar los motores, leer la posición actual y realizar la 
-# navegación basada en campos potenciales. Además, implementa la detección 
-# de mínimos locales y genera un corte en el plano con el mapa de fuerzas.
+# Se encarga de comunicarse con ROS, activar motores, leer la posición actual y
+# navegar usando campos potenciales. Además, detecta mínimos locales y, en ese
+# caso, muestra un corte en el plano XY con la distribución del campo potencial,
+# calculado de forma similar al ejemplo que compartiste, mostrando tanto el
+# objetivo como la ubicación actual del UAV.
 # =============================================================================
 class DroneNavigator:
     def __init__(self, bounds, obstacles):
@@ -62,15 +63,15 @@ class DroneNavigator:
     # Método de navegación basado en campos potenciales con detección de mínimos locales
     # =============================================================================
     def potential_field_navigation(self, goal):
-        # Parámetros de campos potenciales
-        k_att = 1.0   # coeficiente de atracción
-        k_rep = 2.0   # coeficiente de repulsión
-        d0 = 2.0      # distancia de influencia de los obstáculos
+        # Parámetros para la navegación (se usan otros para el cálculo del campo 2D)
+        k_att = 1.0   # coeficiente de atracción (usado para la navegación)
+        k_rep = 2.0   # coeficiente de repulsión (usado para la navegación)
+        d0 = 2.0      # distancia de influencia de los obstáculos (navegación)
         dt = 0.1      # paso de tiempo
 
         # Parámetros para detectar mínimos locales
         epsilon_force = 0.01       # si la norma de la fuerza total es menor que este valor
-        local_min_threshold = 50   # número de iteraciones consecutivas con fuerza muy pequeña
+        local_min_threshold = 50   # iteraciones consecutivas con fuerza muy pequeña
         local_min_counter = 0
 
         trajectory = []  # almacena la trayectoria seguida
@@ -80,25 +81,26 @@ class DroneNavigator:
             if self.current_pose is None:
                 rospy.sleep(0.1)
                 continue
+
             pos = np.array([self.current_pose.x, self.current_pose.y, self.current_pose.z])
             trajectory.append(pos.copy())
 
-            # Verificar si se alcanzó la meta (se usa proximity_radius = 0.3)
+            # Verificar si se alcanzó el objetivo (radio de proximidad = 0.3)
             if np.linalg.norm(pos - goal_np) < 0.3:
                 rospy.loginfo("Objetivo alcanzado.")
                 break
 
-            # Fuerza atractiva (potencial cuadrático)
+            # Fuerza atractiva (modelo cuadrático para la navegación)
             F_att = -k_att * (pos - goal_np)
 
-            # Fuerza repulsiva: se suma la contribución de cada obstáculo
+            # Fuerza repulsiva: contribución de cada obstáculo (modelo caja)
             F_rep_total = np.array([0.0, 0.0, 0.0])
             for obs in self.obstacles:
                 obs_center = np.array(obs["pose"])
                 size = np.array(obs["size"])
                 min_corner = obs_center - size / 2.0
                 max_corner = obs_center + size / 2.0
-                # Se calcula el punto más cercano en el obstáculo (modelo caja)
+                # Punto más cercano en el obstáculo
                 closest_point = np.clip(pos, min_corner, max_corner)
                 diff = pos - closest_point
                 d = np.linalg.norm(diff)
@@ -112,18 +114,18 @@ class DroneNavigator:
             F_total = F_att + F_rep_total
             norm_F_total = np.linalg.norm(F_total)
 
-            # Detectar mínimo local: si la fuerza total es muy pequeña durante varias iteraciones
+            # Detectar mínimo local
             if norm_F_total < epsilon_force:
                 local_min_counter += 1
             else:
                 local_min_counter = 0
 
             if local_min_counter > local_min_threshold:
-                rospy.logwarn("Se ha detectado un mínimo local. Deteniendo el trayecto.")
-                self.display_force_field_slice(goal, pos, k_att, k_rep, d0)
+                rospy.logwarn("Mínimo local detectado. Deteniendo el trayecto.")
+                self.display_force_field_slice(goal, pos)
                 break
 
-            # Actualizar la posición integrando la "velocidad" (igual a la fuerza total)
+            # Actualizar posición integrando la "velocidad" (igual a la fuerza total)
             v = F_total
             new_pos = pos + v * dt
 
@@ -141,78 +143,100 @@ class DroneNavigator:
         return trajectory
 
     # =============================================================================
-    # Método para generar un corte en el plano XY (a la altura en la que se quedó estancado el UAV)
-    # con el mapa de distribución de las fuerzas.
-    # Se calcula la fuerza total (suma de atractiva y repulsiva) en una grilla de puntos en el plano,
-    # y se muestra con un gráfico que incluye:
-    #   - un mapa de contornos de la magnitud del campo,
-    #   - la representación vectorial (quiver) del campo,
-    #   - los obstáculos (dibujados como rectángulos) que intersecan el slice,
-    #   - el objetivo (punto magenta),
-    #   - y la posición actual del UAV (punto azul).
+    # Método para mostrar un corte en el plano XY a la altura actual del UAV, con
+    # el campo potencial calculado siguiendo el modelo del ejemplo:
+    #
+    #   - Se usa un mapa de contornos de la magnitud de la fuerza.
+    #   - Se superpone el campo vectorial (flechas) calculado con los métodos:
+    #       f_attract y f_repulsive (basados en la distribución del ejemplo).
+    #   - Se dibujan los obstáculos (si intersecan el slice).
+    #   - Se marca el objetivo (punto magenta) y la posición actual del UAV (punto azul).
     # =============================================================================
-    def display_force_field_slice(self, goal, pos_stuck, k_att, k_rep, d0):
+    def display_force_field_slice(self, goal, pos_stuck):
+        # Parámetros para el cálculo del campo (según el ejemplo)
+        m_goal = 1.0    # constante de atracción
+        R_soi = 3.0     # radio de influencia de la repulsión
+
         z_level = pos_stuck[2]
         x_min, x_max = self.bounds["x"]
         y_min, y_max = self.bounds["y"]
-        grid_points = 30  # Resolución de la malla
-        x_vals = np.linspace(x_min, x_max, grid_points)
-        y_vals = np.linspace(y_min, y_max, grid_points)
-        grid_x, grid_y = np.meshgrid(x_vals, y_vals)
+        num_points = 30  # Resolución de la malla
+        x_vals = np.linspace(x_min, x_max, num_points)
+        y_vals = np.linspace(y_min, y_max, num_points)
+        X, Y = np.meshgrid(x_vals, y_vals)
 
-        F_total_x = np.zeros_like(grid_x)
-        F_total_y = np.zeros_like(grid_y)
-        M_force = np.zeros_like(grid_x)
+        # --- Definición de funciones locales (idénticas al ejemplo) ---
+        def closest_point_on_box(point, center, size):
+            half = size / 2.0
+            lower = center - half
+            upper = center + half
+            return np.maximum(lower, np.minimum(point, upper))
+
+        def f_attract(pos, goal, m_goal=1.0):
+            diff = goal - pos
+            norm = np.linalg.norm(diff)
+            if norm == 0:
+                return np.zeros(3)
+            return m_goal * diff / norm
+
+        def f_repulsive(pos, obstacles, R_soi=3.0):
+            force = np.zeros(3)
+            for obs in obstacles:
+                center = np.array(obs["pose"])
+                size = np.array(obs["size"])
+                Q = closest_point_on_box(pos, center, size)
+                diff = pos - Q
+                d = np.linalg.norm(diff)
+                R_eff = min(size) / 2.0
+                if d < R_soi:
+                    if d < 1e-6:
+                        d = 1e-6
+                    m_obs = (R_soi - d) / (R_soi - R_eff) if R_soi > R_eff else 1.0
+                    force += m_obs * (diff / d)
+            return force
+
+        def compute_potential_field(X, Y, z, goal, obstacles, m_goal=1.0, R_soi=3.0):
+            U = np.zeros_like(X)
+            V = np.zeros_like(Y)
+            M_force = np.zeros_like(X)
+            for i in range(X.shape[0]):
+                for j in range(X.shape[1]):
+                    pos = np.array([X[i, j], Y[i, j], z])
+                    F_att = f_attract(pos, goal, m_goal)
+                    F_rep = f_repulsive(pos, obstacles, R_soi)
+                    F_total = F_att + F_rep
+                    U[i, j] = F_total[0]
+                    V[i, j] = F_total[1]
+                    M_force[i, j] = np.linalg.norm(F_total)
+            return U, V, M_force
+
+        # Calcular el campo potencial en la malla (usando z = z_level)
         goal_np = np.array(goal)
+        U, V, M_force = compute_potential_field(X, Y, z_level, goal_np, self.obstacles, m_goal, R_soi)
 
-        # Calcular el campo potencial en cada punto de la malla
-        for i in range(grid_x.shape[0]):
-            for j in range(grid_x.shape[1]):
-                point = np.array([grid_x[i, j], grid_y[i, j], z_level])
-                F_att = -k_att * (point - goal_np)
-                F_rep_total = np.array([0.0, 0.0, 0.0])
-                for obs in self.obstacles:
-                    obs_center = np.array(obs["pose"])
-                    size = np.array(obs["size"])
-                    min_corner = obs_center - size / 2.0
-                    max_corner = obs_center + size / 2.0
-                    closest_point = np.clip(point, min_corner, max_corner)
-                    diff = point - closest_point
-                    d = np.linalg.norm(diff)
-                    if d < d0:
-                        if d == 0:
-                            d = 0.001
-                            diff = point - obs_center
-                        F_rep = k_rep * (1.0/d - 1.0/d0) / (d**2) * (diff / d)
-                        F_rep_total += F_rep
-                F_total = F_att + F_rep_total
-                F_total_x[i, j] = F_total[0]
-                F_total_y[i, j] = F_total[1]
-                M_force[i, j] = np.linalg.norm(F_total)
-
-        # Crear la figura de la representación 2D
+        # --- Representación 2D ---
         plt.figure(figsize=(8, 6))
-        # Mapa de contornos de la magnitud del campo potencial
-        contour = plt.contourf(grid_x, grid_y, M_force, alpha=0.6, cmap='viridis')
+        # Mapa de contornos de la magnitud del campo
+        contour = plt.contourf(X, Y, M_force, alpha=0.6, cmap='viridis')
         plt.colorbar(contour, label='Magnitud de la fuerza')
-        # Superponer el campo vectorial (quiver)
-        plt.quiver(grid_x, grid_y, F_total_x, F_total_y, color='white')
+        # Superponer el campo vectorial (flechas)
+        plt.quiver(X, Y, U, V, color='white')
 
-        # Dibujar los obstáculos que intersecan el slice (z = z_level)
         ax = plt.gca()
+        # Dibujar los obstáculos que intersectan el slice (z = z_level)
         for obs in self.obstacles:
-            obs_center = np.array(obs["pose"])
+            center = np.array(obs["pose"])
             size = np.array(obs["size"])
-            z_min_obs = obs_center[2] - size[2] / 2.0
-            z_max_obs = obs_center[2] + size[2] / 2.0
+            z_min_obs = center[2] - size[2] / 2.0
+            z_max_obs = center[2] + size[2] / 2.0
             if z_level >= z_min_obs and z_level <= z_max_obs:
-                x_obs = obs_center[0] - size[0] / 2.0
-                y_obs = obs_center[1] - size[1] / 2.0
+                x_obs = center[0] - size[0] / 2.0
+                y_obs = center[1] - size[1] / 2.0
                 rect = Rectangle((x_obs, y_obs), size[0], size[1],
                                  linewidth=1, edgecolor='r', facecolor='none', alpha=0.8)
                 ax.add_patch(rect)
 
-        # Marcar el objetivo y la posición actual del UAV en el slice
+        # Marcar el objetivo (punto magenta) y la posición actual del UAV (punto azul)
         plt.plot(goal[0], goal[1], 'mo', markersize=8, label='Objetivo')
         plt.plot(pos_stuck[0], pos_stuck[1], 'bo', markersize=8, label='UAV')
         plt.title("Campo Potencial en el plano XY a z = {:.2f}".format(z_level))
@@ -224,13 +248,13 @@ class DroneNavigator:
         plt.show()
 
     # =============================================================================
-    # Método para mostrar de forma interactiva la trayectoria seguida y el mapa de obstáculos
+    # Método para mostrar la trayectoria seguida y los obstáculos en 3D
     # =============================================================================
     def display_route_plot(self, trajectory, start, goal):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        # Graficar los obstáculos (mapa)
+        # Graficar los obstáculos (como cajas)
         for obs in self.obstacles:
             center = obs["pose"]
             size = obs["size"]
@@ -245,7 +269,7 @@ class DroneNavigator:
                 label="Trayectoria", color="blue", marker="o", markersize=3)
 
         ax.scatter([start[0]], [start[1]], [start[2]], color="green", s=100, label="Inicio")
-        ax.scatter([goal[0]], [goal[1]], [goal[2]], color="red", s=100, label="Fin")
+        ax.scatter([goal[0]], [goal[1]], [goal[2]], color="red", s=100, label="Objetivo")
 
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -276,7 +300,7 @@ class DroneNavigator:
             rospy.loginfo(f"Meta recibida: {goal}")
             rospy.loginfo("Iniciando navegación con campos potenciales...")
             trajectory = self.potential_field_navigation(goal)
-            rospy.loginfo("Navegación completada. Mostrando la trayectoria de forma interactiva...")
+            rospy.loginfo("Navegación completada. Mostrando la trayectoria en 3D...")
             self.display_route_plot(trajectory, start, goal)
             rospy.loginfo("Puede ingresar un nuevo objetivo.\n")
 
@@ -291,7 +315,7 @@ if __name__ == '__main__':
             "y": [-10, 10],
             "z": [0, 20]
         }
-        # Se asume que el archivo world.json contiene un diccionario con la clave "obstacles"
+        # Se asume que el archivo world.json contiene una clave "obstacles"
         with open("/home/alvmorcal/robmov_ws/src/quadrotor_planner/scripts/world.json", "r") as f:
             obstacles = json.load(f)["obstacles"]
 
@@ -301,6 +325,7 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
 
