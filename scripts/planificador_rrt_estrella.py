@@ -191,17 +191,12 @@ class DroneNavigator:
     def maintain_hover(self, dt=0.1):
         """
         Mantiene el UAV en hover publicando continuamente comandos PID para
-        mantener la posición actual. Se supone que antes de llamar a esta función,
-        la posición deseada de hover ya ha sido definida.
+        mantener la posición actual.
+        Se supone que antes de llamar a esta función, la posición deseada de hover
+        ya se ha definido en los setpoints del PID.
         """
-        # Establece los setpoints del PID a la posición actual de hover
-        hover_position = (self.current_pose.x, self.current_pose.y, self.current_pose.z)
-        self.pid_x.setpoint = hover_position[0]
-        self.pid_y.setpoint = hover_position[1]
-        self.pid_z.setpoint = hover_position[2]
-        rospy.loginfo("Iniciando modo hover mientras se espera un nuevo objetivo...")
+        rospy.loginfo("Iniciando modo hover...")
         while not self.hover_stop_event.is_set() and not rospy.is_shutdown():
-            # Se calcula y publica el comando basado en la posición actual
             vx = self.pid_x.compute(self.current_pose.x, dt)
             vy = self.pid_y.compute(self.current_pose.y, dt)
             vz = self.pid_z.compute(self.current_pose.z, dt)
@@ -226,7 +221,7 @@ class DroneNavigator:
             # Radio de proximidad para considerar que se alcanzó el waypoint
             proximity_radius = 0.3
 
-            # Actualizar setpoints del PID para cada eje
+            # Actualizar setpoints del PID para cada eje según el waypoint
             self.pid_x.setpoint = waypoint[0]
             self.pid_y.setpoint = waypoint[1]
             self.pid_z.setpoint = waypoint[2]
@@ -241,9 +236,9 @@ class DroneNavigator:
                 waypoint_position = np.array(waypoint)
                 distance = np.linalg.norm(current_position - waypoint_position)
 
-                # Si se alcanza el waypoint intermedio, se envía un comando de detención y se pasa al siguiente
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
+                    # Publica comando de detención
                     stop_twist = TwistStamped()
                     stop_twist.header.stamp = rospy.Time.now()
                     stop_twist.header.frame_id = "world"
@@ -256,9 +251,7 @@ class DroneNavigator:
                     self.twist_pub.publish(stop_twist)
                     break
 
-                dt = 0.1  # Tiempo de muestreo
-
-                # Calcular velocidades usando el controlador PID
+                dt = 0.1
                 vx = self.pid_x.compute(self.current_pose.x, dt)
                 vy = self.pid_y.compute(self.current_pose.y, dt)
                 vz = self.pid_z.compute(self.current_pose.z, dt)
@@ -288,7 +281,6 @@ class DroneNavigator:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        # Graficar los obstáculos
         for obs in self.obstacles:
             center = obs["pose"]
             size = obs["size"]
@@ -298,13 +290,11 @@ class DroneNavigator:
             ax.bar3d(x0, y0, z0, size[0], size[1], size[2],
                      color="gray", alpha=0.3, shade=True)
 
-        # Graficar la trayectoria
         xs = [p[0] for p in path]
         ys = [p[1] for p in path]
         zs = [p[2] for p in path]
         ax.plot(xs, ys, zs, label="Trayectoria", color="blue", marker="o", markersize=3)
 
-        # Graficar el inicio y la meta
         ax.scatter([start[0]], [start[1]], [start[2]], color="green", s=100, label="Inicio")
         ax.scatter([goal[0]], [goal[1]], [goal[2]], color="red", s=100, label="Fin")
 
@@ -318,21 +308,20 @@ class DroneNavigator:
     def plan_and_navigate(self):
         """
         Orquesta la planificación y navegación:
-          1. Obtiene la posición inicial (para usarla como hover).
-          2. Mientras se espera un nuevo objetivo, se mantiene al UAV en hover.
-          3. Una vez ingresado el nuevo objetivo, se planifica la ruta, se navega a ella
-             y se muestra la trayectoria.
+          1. Obtiene la posición actual y la usa para mantener el hover.
+          2. Mientras se espera el nuevo objetivo y se calcula la ruta, se mantiene el hover.
+          3. Una vez que la ruta está planificada, se detiene el hover y se navega.
         """
         while not rospy.is_shutdown():
-            # Obtiene la posición actual y la utiliza como posición de hover
+            # Se obtiene la posición actual para usarla como hover
             start = self.get_start_position()
 
-            # Inicia un hilo que mantenga el UAV en hover mientras se espera el nuevo objetivo
+            # Inicia el modo hover mientras se espera el nuevo objetivo y se calcula la ruta
             self.hover_stop_event = threading.Event()
             hover_thread = threading.Thread(target=self.maintain_hover, args=(0.1,))
             hover_thread.start()
 
-            # Espera a que el usuario ingrese un nuevo objetivo
+            # Espera la entrada del usuario para el nuevo objetivo
             try:
                 goal = (
                     float(input("Ingrese la coordenada X del nuevo objetivo: ")),
@@ -345,17 +334,25 @@ class DroneNavigator:
                 hover_thread.join()
                 continue
 
-            # Se detiene el modo hover antes de iniciar la nueva navegación
-            self.hover_stop_event.set()
-            hover_thread.join()
+            # Actualiza los setpoints para mantener el hover mientras se planifica la ruta
+            hover_position = (self.current_pose.x, self.current_pose.y, self.current_pose.z)
+            self.pid_x.setpoint = hover_position[0]
+            self.pid_y.setpoint = hover_position[1]
+            self.pid_z.setpoint = hover_position[2]
 
-            rospy.loginfo(f"Meta recibida: {goal}")
-            rrt_star = RRTStar(start=start, goal=goal, bounds=self.bounds, obstacles=self.obstacles)
+            # Se calcula la ruta mientras el UAV se mantiene en hover
             rospy.loginfo("Planeando ruta con RRT*...")
+            rrt_star = RRTStar(start=hover_position, goal=goal, bounds=self.bounds, obstacles=self.obstacles)
             path = rrt_star.find_path()
             if not path:
                 rospy.logerr("No se pudo encontrar una ruta válida. Intente con otro objetivo.")
+                self.hover_stop_event.set()
+                hover_thread.join()
                 continue
+
+            # Una vez calculada la ruta, se detiene el hover
+            self.hover_stop_event.set()
+            hover_thread.join()
 
             rospy.loginfo("Ruta encontrada. Suavizando...")
             smoothed_path = rrt_star.smooth_path(path)
@@ -384,6 +381,7 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
 
