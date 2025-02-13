@@ -9,6 +9,7 @@ import subprocess
 from scipy.spatial import KDTree
 import random
 import os
+import threading
 import matplotlib
 # Se establece un backend interactivo (por ejemplo, Qt5Agg)
 matplotlib.use('Qt5Agg')
@@ -122,7 +123,7 @@ class RRTStar:
 # Clase PID
 # -----------------------------------------------------------------------------
 # Controlador PID para cada eje (X, Y, Z) del dron.
-# Se han ajustado los parámetros para obtener movimientos más suaves.
+# Se han ajustado los parámetros para lograr movimientos más suaves.
 # =============================================================================
 class PID:
     def __init__(self, kp, ki, kd, setpoint=0):
@@ -145,6 +146,7 @@ class PID:
 # -----------------------------------------------------------------------------
 # Gestiona la comunicación con ROS, la navegación del dron y la visualización
 # interactiva de la trayectoria junto con el mapa (obstáculos).
+# Además, se implementa un mecanismo de hover (mantener posición) mediante un hilo.
 # =============================================================================
 class DroneNavigator:
     def __init__(self, bounds, obstacles):
@@ -156,10 +158,12 @@ class DroneNavigator:
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
-        # Parámetros PID ajustados para suavizar movimientos
+        # Parámetros PID ajustados para movimientos suaves
         self.pid_x = PID(0.5, 0.005, 0.1)
         self.pid_y = PID(0.5, 0.005, 0.1)
         self.pid_z = PID(0.8, 0.005, 0.1)
+        # Variable para controlar el hilo de hover
+        self.hover_stop_event = None
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -184,6 +188,35 @@ class DroneNavigator:
             rospy.logerr("No se pudo obtener la posición actual. Usando (0, 0, 0) como inicio.")
             return (0, 0, 0)
 
+    def maintain_hover(self, dt=0.1):
+        """
+        Mantiene el UAV en hover publicando continuamente comandos PID para
+        mantener la posición actual. Se supone que antes de llamar a esta función,
+        la posición deseada de hover ya ha sido definida.
+        """
+        # Establece los setpoints del PID a la posición actual de hover
+        hover_position = (self.current_pose.x, self.current_pose.y, self.current_pose.z)
+        self.pid_x.setpoint = hover_position[0]
+        self.pid_y.setpoint = hover_position[1]
+        self.pid_z.setpoint = hover_position[2]
+        rospy.loginfo("Iniciando modo hover mientras se espera un nuevo objetivo...")
+        while not self.hover_stop_event.is_set() and not rospy.is_shutdown():
+            # Se calcula y publica el comando basado en la posición actual
+            vx = self.pid_x.compute(self.current_pose.x, dt)
+            vy = self.pid_y.compute(self.current_pose.y, dt)
+            vz = self.pid_z.compute(self.current_pose.z, dt)
+            twist_msg = TwistStamped()
+            twist_msg.header.stamp = rospy.Time.now()
+            twist_msg.header.frame_id = "world"
+            twist_msg.twist.linear.x = vx
+            twist_msg.twist.linear.y = vy
+            twist_msg.twist.linear.z = vz
+            twist_msg.twist.angular.x = 0
+            twist_msg.twist.angular.y = 0
+            twist_msg.twist.angular.z = 0
+            self.twist_pub.publish(twist_msg)
+            rospy.sleep(dt)
+
     def move_to_waypoints(self, waypoints):
         rospy.loginfo("Iniciando movimiento hacia los waypoints...")
         for i, waypoint in enumerate(waypoints):
@@ -193,7 +226,7 @@ class DroneNavigator:
             # Radio de proximidad para considerar que se alcanzó el waypoint
             proximity_radius = 0.3
 
-            # Actualizar setpoints para cada eje
+            # Actualizar setpoints del PID para cada eje
             self.pid_x.setpoint = waypoint[0]
             self.pid_y.setpoint = waypoint[1]
             self.pid_z.setpoint = waypoint[2]
@@ -208,7 +241,7 @@ class DroneNavigator:
                 waypoint_position = np.array(waypoint)
                 distance = np.linalg.norm(current_position - waypoint_position)
 
-                # Al alcanzar el waypoint se envía comando de velocidad cero
+                # Si se alcanza el waypoint intermedio, se envía un comando de detención y se pasa al siguiente
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
                     stop_twist = TwistStamped()
@@ -221,15 +254,6 @@ class DroneNavigator:
                     stop_twist.twist.angular.y = 0
                     stop_twist.twist.angular.z = 0
                     self.twist_pub.publish(stop_twist)
-
-                    # Si es el último waypoint, se mantiene en hover durante 2 segundos
-                    if i == len(waypoints) - 1:
-                        hover_duration = rospy.Duration(2.0)
-                        hover_end = rospy.Time.now() + hover_duration
-                        while rospy.Time.now() < hover_end and not rospy.is_shutdown():
-                            stop_twist.header.stamp = rospy.Time.now()
-                            self.twist_pub.publish(stop_twist)
-                            rospy.sleep(0.1)
                     break
 
                 dt = 0.1  # Tiempo de muestreo
@@ -294,14 +318,21 @@ class DroneNavigator:
     def plan_and_navigate(self):
         """
         Orquesta la planificación y navegación:
-          1. Obtiene la posición inicial.
-          2. Solicita el objetivo.
-          3. Planifica la ruta con RRT* y la suaviza.
-          4. Navega a través de los waypoints.
-          5. Muestra el gráfico interactivo con la trayectoria y el mapa.
+          1. Obtiene la posición inicial (para usarla como hover).
+          2. Mientras se espera un nuevo objetivo, se mantiene al UAV en hover.
+          3. Una vez ingresado el nuevo objetivo, se planifica la ruta, se navega a ella
+             y se muestra la trayectoria.
         """
         while not rospy.is_shutdown():
+            # Obtiene la posición actual y la utiliza como posición de hover
             start = self.get_start_position()
+
+            # Inicia un hilo que mantenga el UAV en hover mientras se espera el nuevo objetivo
+            self.hover_stop_event = threading.Event()
+            hover_thread = threading.Thread(target=self.maintain_hover, args=(0.1,))
+            hover_thread.start()
+
+            # Espera a que el usuario ingrese un nuevo objetivo
             try:
                 goal = (
                     float(input("Ingrese la coordenada X del nuevo objetivo: ")),
@@ -310,7 +341,13 @@ class DroneNavigator:
                 )
             except ValueError:
                 rospy.logerr("Valores ingresados inválidos. Intente nuevamente.")
+                self.hover_stop_event.set()
+                hover_thread.join()
                 continue
+
+            # Se detiene el modo hover antes de iniciar la nueva navegación
+            self.hover_stop_event.set()
+            hover_thread.join()
 
             rospy.loginfo(f"Meta recibida: {goal}")
             rrt_star = RRTStar(start=start, goal=goal, bounds=self.bounds, obstacles=self.obstacles)
@@ -347,6 +384,7 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
 
