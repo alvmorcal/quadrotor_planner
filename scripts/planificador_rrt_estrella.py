@@ -3,7 +3,7 @@
 import rospy
 import json
 import numpy as np
-from geometry_msgs.msg import PoseStamped, TwistStamped  # Se agrega Twist
+from geometry_msgs.msg import TwistStamped  # Se utiliza TwistStamped en lugar de Twist
 from nav_msgs.msg import Odometry
 import subprocess
 from scipy.spatial import KDTree
@@ -150,6 +150,7 @@ class DroneNavigator:
         rospy.init_node('drone_navigator', anonymous=True)
         self.bounds = bounds
         self.obstacles = obstacles
+        # Se utiliza TwistStamped para publicar comandos de velocidad
         self.twist_pub = rospy.Publisher('/command/twist', TwistStamped, queue_size=10)
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
@@ -186,47 +187,59 @@ class DroneNavigator:
         for i, waypoint in enumerate(waypoints):
             if rospy.is_shutdown():
                 break
+
+            # Definir el radio de proximidad
             proximity_radius = 0.3
+
+            # Establecer los setpoints del PID para cada eje
             self.pid_x.setpoint = waypoint[0]
             self.pid_y.setpoint = waypoint[1]
             self.pid_z.setpoint = waypoint[2]
+
             while not rospy.is_shutdown():
                 if self.current_pose is None:
                     rospy.logwarn("Esperando datos de la posición actual...")
                     rospy.sleep(0.1)
                     continue
+
                 current_position = np.array([self.current_pose.x, self.current_pose.y, self.current_pose.z])
                 waypoint_position = np.array(waypoint)
                 distance = np.linalg.norm(current_position - waypoint_position)
+
+                # Si se alcanza el waypoint, se envía un comando de velocidad cero
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
-                    # Enviar velocidades cero para detener el dron
-                    twist_msg = TwistStamped()
-                    twist_msg.header.stamp = rospy.Time.now()
-                    twist_msg.header.frame_id = "world"  # Indica el frame de referencia adecuado
-                    twist_msg.twist.linear.x = vx
-                    twist_msg.twist.linear.y = vy
-                    twist_msg.twist.linear.z = vz
-                    twist_msg.twist.angular.x = 0
-                    twist_msg.twist.angular.y = 0
-                    twist_msg.twist.angular.z = 0
-                    self.twist_pub.publish(twist_msg)
+                    stop_twist = TwistStamped()
+                    stop_twist.header.stamp = rospy.Time.now()
+                    stop_twist.header.frame_id = "world"
+                    stop_twist.twist.linear.x = 0
+                    stop_twist.twist.linear.y = 0
+                    stop_twist.twist.linear.z = 0
+                    stop_twist.twist.angular.x = 0
+                    stop_twist.twist.angular.y = 0
+                    stop_twist.twist.angular.z = 0
+                    self.twist_pub.publish(stop_twist)
                     break
+
+                # Tiempo de muestreo
                 dt = 0.1
+
+                # Calcular velocidades en cada eje mediante el controlador PID
                 vx = self.pid_x.compute(self.current_pose.x, dt)
                 vy = self.pid_y.compute(self.current_pose.y, dt)
                 vz = self.pid_z.compute(self.current_pose.z, dt)
-                
-                stop_twist = TwistStamped()
-                stop_twist.header.stamp = rospy.Time.now()
-                stop_twist.header.frame_id = "world"  # Usar el mismo frame que el comando
-                stop_twist.twist.linear.x = 0
-                stop_twist.twist.linear.y = 0
-                stop_twist.twist.linear.z = 0
-                stop_twist.twist.angular.x = 0
-                stop_twist.twist.angular.y = 0
-                stop_twist.twist.angular.z = 0
-                self.twist_pub.publish(stop_twist)
+
+                twist_msg = TwistStamped()
+                twist_msg.header.stamp = rospy.Time.now()
+                twist_msg.header.frame_id = "world"
+                twist_msg.twist.linear.x = vx
+                twist_msg.twist.linear.y = vy
+                twist_msg.twist.linear.z = vz
+                twist_msg.twist.angular.x = 0
+                twist_msg.twist.angular.y = 0
+                twist_msg.twist.angular.z = 0
+
+                self.twist_pub.publish(twist_msg)
                 rospy.sleep(dt)
         rospy.loginfo(f"Waypoints completados. Posición final: ({self.current_pose.x}, {self.current_pose.y}, {self.current_pose.z})")
 
@@ -242,7 +255,7 @@ class DroneNavigator:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        # Graficar el mapa: Obstáculos
+        # Graficar los obstáculos
         for obs in self.obstacles:
             center = obs["pose"]
             size = obs["size"]
@@ -267,7 +280,6 @@ class DroneNavigator:
         ax.set_zlabel("Z")
         ax.legend()
 
-        # Mostrar la figura de forma interactiva (la ejecución se bloquea hasta que la ventana se cierra)
         plt.show()
 
     def plan_and_navigate(self):
@@ -326,5 +338,6 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
