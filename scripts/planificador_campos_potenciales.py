@@ -404,7 +404,7 @@ if __name__ == '__main__':
             "y": [-10, 10],
             "z": [0, 20]
         }
-        with open("/home/alvmorcal/robmov_ws/src/quadrotor_planner/scripts/world.json", "r") as f:
+        with open("/world.json", "r") as f:
             obstacles = json.load(f)["obstacles"]
 
         navigator = DroneNavigator(bounds, obstacles)
