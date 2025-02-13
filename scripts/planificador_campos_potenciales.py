@@ -3,7 +3,7 @@
 import rospy
 import json
 import numpy as np
-from geometry_msgs.msg import Twist  # Para publicar velocidades
+from geometry_msgs.msg import TwistStamped  # Se usa TwistStamped para enviar velocidades
 from nav_msgs.msg import Odometry
 import subprocess
 import matplotlib
@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # Para la proyección 3D
 from matplotlib.patches import Rectangle
 from datetime import datetime
+import threading
 
 # Activar el modo interactivo de Matplotlib
 plt.ion()
@@ -42,26 +43,28 @@ class PID:
 # Clase DroneNavigator
 # -----------------------------------------------------------------------------
 # Se encarga de comunicarse con ROS, activar los motores, leer la posición
-# actual y navegar usando campos potenciales. Se detectan mínimos locales y se
-# comanda al dron utilizando un controlador PID para cada eje, publicando
-# comandos de velocidad (Twist).
+# actual y navegar usando campos potenciales. Además, se implementa un mecanismo
+# para mantener el UAV en hover (publicando comandos de velocidad) mientras se 
+# espera un nuevo objetivo o se calcula la ruta.
 # =============================================================================
 class DroneNavigator:
     def __init__(self, bounds, obstacles):
         rospy.init_node('drone_navigator', anonymous=True)
         self.bounds = bounds
         self.obstacles = obstacles
-        # Publicador de Twist para enviar comandos de velocidad
-        self.vel_pub = rospy.Publisher('/command/twist', Twist, queue_size=10)
+        # Publicador para comandos de velocidad (TwistStamped)
+        self.vel_pub = rospy.Publisher('/command/twist', TwistStamped, queue_size=10)
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
 
         # Inicializamos los controladores PID para cada eje.
-        # Estos parámetros se pueden ajustar según la respuesta deseada.
         self.pid_x = PID(2.0, 0.01, 0.8)
         self.pid_y = PID(2.0, 0.01, 0.8)
         self.pid_z = PID(3.0, 0.05, 1.2)
+
+        # Variable para controlar el hilo de hover
+        self.hover_stop_event = None
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -86,15 +89,42 @@ class DroneNavigator:
             rospy.logerr("No se pudo obtener la posición actual. Usando (0, 0, 0) como inicio.")
             return (0, 0, 0)
 
+    def maintain_hover(self, dt=0.1):
+        """
+        Mantiene el UAV en hover publicando continuamente comandos basados en 
+        los controladores PID para mantener la posición actual.
+        Se supone que antes de llamar a esta función, la posición deseada ya ha
+        sido definida en los setpoints del PID.
+        """
+        rospy.loginfo("Iniciando modo hover...")
+        while not self.hover_stop_event.is_set() and not rospy.is_shutdown():
+            # Se calculan las velocidades para mantener la posición
+            vx = self.pid_x.compute(self.current_pose.x, dt)
+            vy = self.pid_y.compute(self.current_pose.y, dt)
+            vz = self.pid_z.compute(self.current_pose.z, dt)
+            twist_msg = TwistStamped()
+            twist_msg.header.stamp = rospy.Time.now()
+            twist_msg.header.frame_id = "world"
+            twist_msg.twist.linear.x = vx
+            twist_msg.twist.linear.y = vy
+            twist_msg.twist.linear.z = vz
+            twist_msg.twist.angular.x = 0
+            twist_msg.twist.angular.y = 0
+            twist_msg.twist.angular.z = 0
+            self.vel_pub.publish(twist_msg)
+            rospy.sleep(dt)
+
     # =============================================================================
-    # Método de navegación basado en campos potenciales con PID para comandar
-    # las velocidades (publicando Twist).
+    # Navegación por campos potenciales
     #
     # En cada iteración:
-    #   - Se calcula la fuerza resultante (atractiva + repulsiva).
-    #   - Se define una posición deseada (actual + F_total * dt).
+    #   - Se calcula la fuerza atractiva (hacia el objetivo) y repulsiva (de los
+    #     obstáculos).
+    #   - Se define una posición deseada usando la integración (pos + F_total * dt).
     #   - Se actualizan los setpoints de cada PID y se calculan las velocidades.
-    #   - Se publica un mensaje Twist con esas velocidades.
+    #   - Se publica un mensaje TwistStamped con esas velocidades.
+    #
+    # Si se alcanza el objetivo (dentro de un radio de 0.3) se finaliza.
     # =============================================================================
     def potential_field_navigation(self, goal):
         # Parámetros para la navegación por campos potenciales
@@ -116,26 +146,33 @@ class DroneNavigator:
                 rospy.sleep(0.1)
                 continue
 
-            # Obtener la posición actual
             pos = np.array([self.current_pose.x, self.current_pose.y, self.current_pose.z])
             trajectory.append(pos.copy())
 
             # Verificar si se alcanzó el objetivo (radio de proximidad = 0.3)
             if np.linalg.norm(pos - goal_np) < 0.3:
                 rospy.loginfo("Objetivo alcanzado.")
+                # Publicar comando de hover (velocidades cero)
+                stop_msg = TwistStamped()
+                stop_msg.header.stamp = rospy.Time.now()
+                stop_msg.header.frame_id = "world"
+                stop_msg.twist.linear.x = 0
+                stop_msg.twist.linear.y = 0
+                stop_msg.twist.linear.z = 0
+                self.vel_pub.publish(stop_msg)
                 break
 
-            # Calcular fuerza atractiva (modelo cuadrático)
+            # Calcular fuerza atractiva (modelo lineal)
             F_att = -k_att * (pos - goal_np)
 
-            # Calcular fuerza repulsiva: contribución de cada obstáculo (modelo caja)
+            # Calcular fuerza repulsiva: para cada obstáculo (modelo caja)
             F_rep_total = np.array([0.0, 0.0, 0.0])
             for obs in self.obstacles:
                 obs_center = np.array(obs["pose"])
                 size = np.array(obs["size"])
                 min_corner = obs_center - size / 2.0
                 max_corner = obs_center + size / 2.0
-                # Se calcula el punto más cercano en el obstáculo
+                # Punto más cercano en el obstáculo
                 closest_point = np.clip(pos, min_corner, max_corner)
                 diff = pos - closest_point
                 d = np.linalg.norm(diff)
@@ -156,33 +193,33 @@ class DroneNavigator:
                 local_min_counter = 0
 
             if local_min_counter > local_min_threshold:
-                rospy.logwarn("Se ha detectado un mínimo local. Deteniendo el trayecto.")
+                rospy.logwarn("Mínimo local detectado. Deteniendo la navegación.")
                 self.display_force_field_slice(goal, pos)
                 break
 
-            # --- Integración con PID ---
-            # Se define la posición deseada usando la salida del campo potencial
+            # Se define la posición deseada (integración simple)
             desired_pos = pos + F_total * dt
 
-            # Actualizar los setpoints de los controladores PID
+            # Actualizar los setpoints de los PID
             self.pid_x.setpoint = desired_pos[0]
             self.pid_y.setpoint = desired_pos[1]
             self.pid_z.setpoint = desired_pos[2]
 
-            # Calcular velocidades de corrección en cada eje
+            # Calcular velocidades en cada eje usando el PID
             vx = self.pid_x.compute(pos[0], dt)
             vy = self.pid_y.compute(pos[1], dt)
             vz = self.pid_z.compute(pos[2], dt)
 
-            # Publicar el comando de velocidad usando Twist
-            twist_msg = Twist()
-            twist_msg.linear.x = vx
-            twist_msg.linear.y = vy
-            twist_msg.linear.z = vz
-            # No se envían comandos de velocidad angular en este ejemplo
-            twist_msg.angular.x = 0
-            twist_msg.angular.y = 0
-            twist_msg.angular.z = 0
+            # Publicar comando de velocidad con TwistStamped
+            twist_msg = TwistStamped()
+            twist_msg.header.stamp = rospy.Time.now()
+            twist_msg.header.frame_id = "world"
+            twist_msg.twist.linear.x = vx
+            twist_msg.twist.linear.y = vy
+            twist_msg.twist.linear.z = vz
+            twist_msg.twist.angular.x = 0
+            twist_msg.twist.angular.y = 0
+            twist_msg.twist.angular.z = 0
             self.vel_pub.publish(twist_msg)
 
             rospy.sleep(dt)
@@ -191,26 +228,20 @@ class DroneNavigator:
 
     # =============================================================================
     # Método para representar en 2D un corte en el plano XY (a la altura actual del UAV)
-    # con el campo potencial calculado siguiendo el modelo del ejemplo:
-    #   - Mapa de contornos de la magnitud de la fuerza.
-    #   - Campo vectorial (flechas) calculado según el modelo.
-    #   - Obstáculos (dibujados como rectángulos) que intersecan el slice.
-    #   - Objetivo (punto magenta) y posición actual del UAV (punto azul).
+    # con el campo potencial calculado.
     # =============================================================================
     def display_force_field_slice(self, goal, pos_stuck):
-        # Parámetros para el cálculo del campo (modelo del ejemplo)
         m_goal = 1.0    # constante de atracción
         R_soi = 3.0     # radio de influencia de la repulsión
 
         z_level = pos_stuck[2]
         x_min, x_max = self.bounds["x"]
         y_min, y_max = self.bounds["y"]
-        num_points = 30  # Resolución de la malla
+        num_points = 30
         x_vals = np.linspace(x_min, x_max, num_points)
         y_vals = np.linspace(y_min, y_max, num_points)
         X, Y = np.meshgrid(x_vals, y_vals)
 
-        # --- Funciones locales (idénticas al ejemplo) ---
         def closest_point_on_box(point, center, size):
             half = size / 2.0
             lower = center - half
@@ -255,20 +286,15 @@ class DroneNavigator:
                     M_force[i, j] = np.linalg.norm(F_total)
             return U, V, M_force
 
-        # Calcular el campo potencial en la malla (usando z = z_level)
         goal_np = np.array(goal)
         U, V, M_force = compute_potential_field(X, Y, z_level, goal_np, self.obstacles, m_goal, R_soi)
 
-        # --- Representación 2D ---
         plt.figure(figsize=(8, 6))
-        # Mapa de contornos de la magnitud del campo
         contour = plt.contourf(X, Y, M_force, alpha=0.6, cmap='viridis')
         plt.colorbar(contour, label='Magnitud de la fuerza')
-        # Campo vectorial (flechas)
         plt.quiver(X, Y, U, V, color='white')
 
         ax = plt.gca()
-        # Dibujar obstáculos que intersectan el slice (z = z_level)
         for obs in self.obstacles:
             center = np.array(obs["pose"])
             size = np.array(obs["size"])
@@ -281,7 +307,6 @@ class DroneNavigator:
                                  linewidth=1, edgecolor='r', facecolor='none', alpha=0.8)
                 ax.add_patch(rect)
 
-        # Marcar el objetivo (punto magenta) y la posición actual del UAV (punto azul)
         plt.plot(goal[0], goal[1], 'mo', markersize=8, label='Objetivo')
         plt.plot(pos_stuck[0], pos_stuck[1], 'bo', markersize=8, label='UAV')
         plt.title("Campo Potencial en el plano XY a z = {:.2f}".format(z_level))
@@ -293,45 +318,22 @@ class DroneNavigator:
         plt.show()
 
     # =============================================================================
-    # Método para mostrar la trayectoria seguida y los obstáculos en 3D
-    # =============================================================================
-    def display_route_plot(self, trajectory, start, goal):
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        # Graficar obstáculos (como cajas)
-        for obs in self.obstacles:
-            center = obs["pose"]
-            size = obs["size"]
-            x0 = center[0] - size[0] / 2.0
-            y0 = center[1] - size[1] / 2.0
-            z0 = center[2] - size[2] / 2.0
-            ax.bar3d(x0, y0, z0, size[0], size[1], size[2],
-                     color="gray", alpha=0.3, shade=True)
-
-        trajectory = np.array(trajectory)
-        ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2],
-                label="Trayectoria", color="blue", marker="o", markersize=3)
-
-        ax.scatter([start[0]], [start[1]], [start[2]], color="green", s=100, label="Inicio")
-        ax.scatter([goal[0]], [goal[1]], [goal[2]], color="red", s=100, label="Objetivo")
-
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
-        ax.legend()
-        plt.show()
-
-    # =============================================================================
     # Método principal que orquesta el proceso:
-    #   1. Obtiene la posición actual (inicio).
-    #   2. Solicita el objetivo.
-    #   3. Ejecuta la navegación basada en campos potenciales (usando PID).
-    #   4. Si se alcanza la meta o se detecta un mínimo local, muestra el gráfico interactivo.
+    #   1. Obtiene la posición actual (inicio/hover).
+    #   2. Inicia un hilo para mantener el hover mientras se espera un nuevo objetivo.
+    #   3. Una vez ingresado el nuevo objetivo, se detiene el hover y se ejecuta la
+    #      navegación por campos potenciales.
+    #   4. Se muestra la trayectoria y se vuelve a esperar un nuevo objetivo.
     # =============================================================================
     def plan_and_navigate(self):
         while not rospy.is_shutdown():
             start = self.get_start_position()
+
+            # Iniciar modo hover mientras se espera el nuevo objetivo
+            self.hover_stop_event = threading.Event()
+            hover_thread = threading.Thread(target=self.maintain_hover, args=(0.1,))
+            hover_thread.start()
+
             try:
                 goal = (
                     float(input("Ingrese la coordenada X del nuevo objetivo: ")),
@@ -340,15 +342,28 @@ class DroneNavigator:
                 )
             except ValueError:
                 rospy.logerr("Valores ingresados inválidos. Intente nuevamente.")
+                self.hover_stop_event.set()
+                hover_thread.join()
                 continue
 
+            # Detener el modo hover antes de comenzar la navegación
+            self.hover_stop_event.set()
+            hover_thread.join()
+
             rospy.loginfo(f"Meta recibida: {goal}")
-            rospy.loginfo("Iniciando navegación con campos potenciales y control PID (publicando Twist)...")
+
+            # Actualizar los setpoints de los PID para mantener la posición actual mientras
+            # se inicia la navegación por campos potenciales.
+            hover_position = (self.current_pose.x, self.current_pose.y, self.current_pose.z)
+            self.pid_x.setpoint = hover_position[0]
+            self.pid_y.setpoint = hover_position[1]
+            self.pid_z.setpoint = hover_position[2]
+
+            rospy.loginfo("Iniciando navegación por campos potenciales con control PID...")
             trajectory = self.potential_field_navigation(goal)
-            rospy.loginfo("Navegación completada. Mostrando la trayectoria en 3D...")
+            rospy.loginfo("Navegación completada. Mostrando trayectoria en 3D...")
             self.display_route_plot(trajectory, start, goal)
             rospy.loginfo("Puede ingresar un nuevo objetivo.\n")
-
 
 # =============================================================================
 # Main del script
@@ -360,7 +375,6 @@ if __name__ == '__main__':
             "y": [-10, 10],
             "z": [0, 20]
         }
-        # Se asume que el archivo world.json contiene una clave "obstacles"
         with open("/home/alvmorcal/robmov_ws/src/quadrotor_planner/scripts/world.json", "r") as f:
             obstacles = json.load(f)["obstacles"]
 
@@ -370,6 +384,7 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
 
