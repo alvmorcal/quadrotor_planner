@@ -3,7 +3,7 @@
 import rospy
 import json
 import numpy as np
-from geometry_msgs.msg import TwistStamped  # Se usa TwistStamped para enviar velocidades
+from geometry_msgs.msg import TwistStamped  # Usamos TwistStamped para enviar velocidades
 from nav_msgs.msg import Odometry
 import subprocess
 import matplotlib
@@ -44,7 +44,7 @@ class PID:
 # -----------------------------------------------------------------------------
 # Se encarga de comunicarse con ROS, activar los motores, leer la posición
 # actual y navegar usando campos potenciales. Además, se implementa un mecanismo
-# para mantener el UAV en hover (publicando comandos de velocidad) mientras se 
+# para mantener al UAV en hover (publicando comandos de velocidad) mientras se 
 # espera un nuevo objetivo o se calcula la ruta.
 # =============================================================================
 class DroneNavigator:
@@ -89,16 +89,19 @@ class DroneNavigator:
             rospy.logerr("No se pudo obtener la posición actual. Usando (0, 0, 0) como inicio.")
             return (0, 0, 0)
 
-    def maintain_hover(self, dt=0.1):
+    def maintain_hover(self, dt=0.05):
         """
         Mantiene el UAV en hover publicando continuamente comandos basados en 
-        los controladores PID para mantener la posición actual.
-        Se supone que antes de llamar a esta función, la posición deseada ya ha
-        sido definida en los setpoints del PID.
+        los controladores PID para mantener la posición inicial.
+        Se supone que antes de llamar a esta función se fija la posición de hover.
         """
+        # Fijar la posición de hover
+        hover_position = (self.current_pose.x, self.current_pose.y, self.current_pose.z)
+        self.pid_x.setpoint = hover_position[0]
+        self.pid_y.setpoint = hover_position[1]
+        self.pid_z.setpoint = hover_position[2]
         rospy.loginfo("Iniciando modo hover...")
         while not self.hover_stop_event.is_set() and not rospy.is_shutdown():
-            # Se calculan las velocidades para mantener la posición
             vx = self.pid_x.compute(self.current_pose.x, dt)
             vy = self.pid_y.compute(self.current_pose.y, dt)
             vz = self.pid_z.compute(self.current_pose.z, dt)
@@ -118,8 +121,7 @@ class DroneNavigator:
     # Navegación por campos potenciales
     #
     # En cada iteración:
-    #   - Se calcula la fuerza atractiva (hacia el objetivo) y repulsiva (de los
-    #     obstáculos).
+    #   - Se calcula la fuerza atractiva (hacia el objetivo) y repulsiva (de los obstáculos).
     #   - Se define una posición deseada usando la integración (pos + F_total * dt).
     #   - Se actualizan los setpoints de cada PID y se calculan las velocidades.
     #   - Se publica un mensaje TwistStamped con esas velocidades.
@@ -152,7 +154,6 @@ class DroneNavigator:
             # Verificar si se alcanzó el objetivo (radio de proximidad = 0.3)
             if np.linalg.norm(pos - goal_np) < 0.3:
                 rospy.loginfo("Objetivo alcanzado.")
-                # Publicar comando de hover (velocidades cero)
                 stop_msg = TwistStamped()
                 stop_msg.header.stamp = rospy.Time.now()
                 stop_msg.header.frame_id = "world"
@@ -165,7 +166,7 @@ class DroneNavigator:
             # Calcular fuerza atractiva (modelo lineal)
             F_att = -k_att * (pos - goal_np)
 
-            # Calcular fuerza repulsiva: para cada obstáculo (modelo caja)
+            # Calcular fuerza repulsiva para cada obstáculo (modelo de "caja")
             F_rep_total = np.array([0.0, 0.0, 0.0])
             for obs in self.obstacles:
                 obs_center = np.array(obs["pose"])
@@ -210,7 +211,6 @@ class DroneNavigator:
             vy = self.pid_y.compute(pos[1], dt)
             vz = self.pid_z.compute(pos[2], dt)
 
-            # Publicar comando de velocidad con TwistStamped
             twist_msg = TwistStamped()
             twist_msg.header.stamp = rospy.Time.now()
             twist_msg.header.frame_id = "world"
@@ -318,8 +318,38 @@ class DroneNavigator:
         plt.show()
 
     # =============================================================================
+    # Método para representar la trayectoria seguida en 3D.
+    # =============================================================================
+    def display_route_plot(self, trajectory, start, goal):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Dibujar obstáculos
+        for obs in self.obstacles:
+            center = obs["pose"]
+            size = obs["size"]
+            x0 = center[0] - size[0] / 2.0
+            y0 = center[1] - size[1] / 2.0
+            z0 = center[2] - size[2] / 2.0
+            ax.bar3d(x0, y0, z0, size[0], size[1], size[2],
+                     color="gray", alpha=0.3, shade=True)
+
+        trajectory = np.array(trajectory)
+        ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2],
+                label="Trayectoria", color="blue", marker="o", markersize=3)
+
+        ax.scatter([start[0]], [start[1]], [start[2]], color="green", s=100, label="Inicio")
+        ax.scatter([goal[0]], [goal[1]], [goal[2]], color="red", s=100, label="Objetivo")
+
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.legend()
+        plt.show()
+
+    # =============================================================================
     # Método principal que orquesta el proceso:
-    #   1. Obtiene la posición actual (inicio/hover).
+    #   1. Obtiene la posición actual (que se usará como hover).
     #   2. Inicia un hilo para mantener el hover mientras se espera un nuevo objetivo.
     #   3. Una vez ingresado el nuevo objetivo, se detiene el hover y se ejecuta la
     #      navegación por campos potenciales.
@@ -331,7 +361,7 @@ class DroneNavigator:
 
             # Iniciar modo hover mientras se espera el nuevo objetivo
             self.hover_stop_event = threading.Event()
-            hover_thread = threading.Thread(target=self.maintain_hover, args=(0.1,))
+            hover_thread = threading.Thread(target=self.maintain_hover, args=(0.05,))
             hover_thread.start()
 
             try:
@@ -352,8 +382,7 @@ class DroneNavigator:
 
             rospy.loginfo(f"Meta recibida: {goal}")
 
-            # Actualizar los setpoints de los PID para mantener la posición actual mientras
-            # se inicia la navegación por campos potenciales.
+            # Actualizar los setpoints de los PID para fijar la posición actual (hover) mientras se planifica
             hover_position = (self.current_pose.x, self.current_pose.y, self.current_pose.z)
             self.pid_x.setpoint = hover_position[0]
             self.pid_y.setpoint = hover_position[1]
@@ -384,6 +413,7 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
 
