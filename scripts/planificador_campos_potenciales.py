@@ -136,7 +136,7 @@ class DroneNavigator:
         dt = 0.1      # intervalo de tiempo
 
         # Parámetros para la detección de mínimos locales
-        epsilon_force = 0.1       # umbral para considerar que hay un mínimo local
+        epsilon_force = 0.25       # umbral para considerar que hay un mínimo local
         local_min_threshold = 25   # iteraciones consecutivas con fuerza muy pequeña
         local_min_counter = 0
 
