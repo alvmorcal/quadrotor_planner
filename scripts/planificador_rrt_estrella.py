@@ -201,30 +201,32 @@ class DroneNavigator:
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
                     # Enviar velocidades cero para detener el dron
-                    stop_twist = TwistStamped()
-                    stop_twist.header.stamp = rospy.Time.now()
-                    stop_twist.twist.linear.x = 0
-                    stop_twist.twist.linear.y = 0
-                    stop_twist.twist.linear.z = 0
-                    stop_twist.twist.angular.x = 0
-                    stop_twist.twist.angular.y = 0
-                    stop_twist.twist.angular.z = 0
-                    self.twist_pub.publish(stop_twist)
+                    twist_msg = TwistStamped()
+                    twist_msg.header.stamp = rospy.Time.now()
+                    twist_msg.header.frame_id = "world"  # Indica el frame de referencia adecuado
+                    twist_msg.twist.linear.x = vx
+                    twist_msg.twist.linear.y = vy
+                    twist_msg.twist.linear.z = vz
+                    twist_msg.twist.angular.x = 0
+                    twist_msg.twist.angular.y = 0
+                    twist_msg.twist.angular.z = 0
+                    self.twist_pub.publish(twist_msg)
                     break
                 dt = 0.1
                 vx = self.pid_x.compute(self.current_pose.x, dt)
                 vy = self.pid_y.compute(self.current_pose.y, dt)
                 vz = self.pid_z.compute(self.current_pose.z, dt)
                 
-                twist_msg = TwistStamped()
-                twist_msg.header.stamp = rospy.Time.now()
-                twist_msg.twist.linear.x = vx
-                twist_msg.twist.linear.y = vy
-                twist_msg.twist.linear.z = vz
-                twist_msg.twist.angular.x = 0
-                twist_msg.twist.angular.y = 0
-                twist_msg.twist.angular.z = 0
-                self.twist_pub.publish(twist_msg)
+                stop_twist = TwistStamped()
+                stop_twist.header.stamp = rospy.Time.now()
+                stop_twist.header.frame_id = "world"  # Usar el mismo frame que el comando
+                stop_twist.twist.linear.x = 0
+                stop_twist.twist.linear.y = 0
+                stop_twist.twist.linear.z = 0
+                stop_twist.twist.angular.x = 0
+                stop_twist.twist.angular.y = 0
+                stop_twist.twist.angular.z = 0
+                self.twist_pub.publish(stop_twist)
                 rospy.sleep(dt)
         rospy.loginfo(f"Waypoints completados. Posición final: ({self.current_pose.x}, {self.current_pose.y}, {self.current_pose.z})")
 
