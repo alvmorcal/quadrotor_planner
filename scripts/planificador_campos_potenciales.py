@@ -59,9 +59,9 @@ class DroneNavigator:
         self.rate = rospy.Rate(10)
 
         # Inicializamos los controladores PID para cada eje.
-        self.pid_x = PID(2.5, 0.01, 0.8)
-        self.pid_y = PID(2.5, 0.01, 0.8)
-        self.pid_z = PID(4.0, 0.05, 1.2)
+        self.pid_x = PID(1.5, 0.01, 0.8)
+        self.pid_y = PID(1.5, 0.01, 0.8)
+        self.pid_z = PID(3.0, 0.05, 1.2)
 
         # Variable para controlar el hilo de hover
         self.hover_stop_event = None
@@ -131,8 +131,8 @@ class DroneNavigator:
     def potential_field_navigation(self, goal):
         # Parámetros para la navegación por campos potenciales
         k_att = 1.0   # coeficiente de atracción
-        k_rep = 2   # coeficiente de repulsión
-        d0 = 2.0      # distancia de influencia de los obstáculos
+        k_rep = 2.5   # coeficiente de repulsión
+        d0 = 4.0      # distancia de influencia de los obstáculos
         dt = 0.1      # intervalo de tiempo
 
         # Parámetros para la detección de mínimos locales
