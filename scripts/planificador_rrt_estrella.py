@@ -3,7 +3,7 @@
 import rospy
 import json
 import numpy as np
-from geometry_msgs.msg import PoseStamped, Twist  # Se agrega Twist
+from geometry_msgs.msg import PoseStamped, TwistStamped  # Se agrega Twist
 from nav_msgs.msg import Odometry
 import subprocess
 from scipy.spatial import KDTree
@@ -150,9 +150,7 @@ class DroneNavigator:
         rospy.init_node('drone_navigator', anonymous=True)
         self.bounds = bounds
         self.obstacles = obstacles
-        # Se comenta el publicador de PoseStamped y se utiliza Twist para publicar velocidades
-        # self.pose_pub = rospy.Publisher('/command/pose', PoseStamped, queue_size=10)
-        self.twist_pub = rospy.Publisher('/command/twist', Twist, queue_size=10)
+        self.twist_pub = rospy.Publisher('/command/twist', TwistStamped, queue_size=10)
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
@@ -183,12 +181,11 @@ class DroneNavigator:
             rospy.logerr("No se pudo obtener la posición actual. Usando (0, 0, 0) como inicio.")
             return (0, 0, 0)
 
-    def move_to_waypoints(self, waypoints):
+        def move_to_waypoints(self, waypoints):
         rospy.loginfo("Iniciando movimiento hacia los waypoints...")
         for i, waypoint in enumerate(waypoints):
             if rospy.is_shutdown():
                 break
-            # Se establece un radio de proximidad de 0.3 para todos los waypoints
             proximity_radius = 0.3
             self.pid_x.setpoint = waypoint[0]
             self.pid_y.setpoint = waypoint[1]
@@ -204,13 +201,14 @@ class DroneNavigator:
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
                     # Enviar velocidades cero para detener el dron
-                    stop_twist = Twist()
-                    stop_twist.linear.x = 0
-                    stop_twist.linear.y = 0
-                    stop_twist.linear.z = 0
-                    stop_twist.angular.x = 0
-                    stop_twist.angular.y = 0
-                    stop_twist.angular.z = 0
+                    stop_twist = TwistStamped()
+                    stop_twist.header.stamp = rospy.Time.now()
+                    stop_twist.twist.linear.x = 0
+                    stop_twist.twist.linear.y = 0
+                    stop_twist.twist.linear.z = 0
+                    stop_twist.twist.angular.x = 0
+                    stop_twist.twist.angular.y = 0
+                    stop_twist.twist.angular.z = 0
                     self.twist_pub.publish(stop_twist)
                     break
                 dt = 0.1
@@ -218,14 +216,14 @@ class DroneNavigator:
                 vy = self.pid_y.compute(self.current_pose.y, dt)
                 vz = self.pid_z.compute(self.current_pose.z, dt)
                 
-                twist_msg = Twist()
-                twist_msg.linear.x = vx
-                twist_msg.linear.y = vy
-                twist_msg.linear.z = vz
-                # Se asume que no se requiere control angular en este ejemplo
-                twist_msg.angular.x = 0
-                twist_msg.angular.y = 0
-                twist_msg.angular.z = 0
+                twist_msg = TwistStamped()
+                twist_msg.header.stamp = rospy.Time.now()
+                twist_msg.twist.linear.x = vx
+                twist_msg.twist.linear.y = vy
+                twist_msg.twist.linear.z = vz
+                twist_msg.twist.angular.x = 0
+                twist_msg.twist.angular.y = 0
+                twist_msg.twist.angular.z = 0
                 self.twist_pub.publish(twist_msg)
                 rospy.sleep(dt)
         rospy.loginfo(f"Waypoints completados. Posición final: ({self.current_pose.x}, {self.current_pose.y}, {self.current_pose.z})")
