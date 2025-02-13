@@ -155,9 +155,9 @@ class DroneNavigator:
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
-        self.pid_x = PID(2.0, 0.01, 0.8)
-        self.pid_y = PID(2.0, 0.01, 0.8)
-        self.pid_z = PID(3.0, 0.05, 1.2)
+        self.pid_x = PID(1.0, 0.01, 0.4)
+        self.pid_y = PID(1.0, 0.01, 0.4)
+        self.pid_z = PID(2.0, 0.05, 1.0)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
