@@ -181,7 +181,7 @@ class DroneNavigator:
             rospy.logerr("No se pudo obtener la posición actual. Usando (0, 0, 0) como inicio.")
             return (0, 0, 0)
 
-        def move_to_waypoints(self, waypoints):
+    def move_to_waypoints(self, waypoints):
         rospy.loginfo("Iniciando movimiento hacia los waypoints...")
         for i, waypoint in enumerate(waypoints):
             if rospy.is_shutdown():
