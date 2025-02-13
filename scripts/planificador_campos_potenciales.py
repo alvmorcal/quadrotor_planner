@@ -59,9 +59,9 @@ class DroneNavigator:
         self.rate = rospy.Rate(10)
 
         # Inicializamos los controladores PID para cada eje.
-        self.pid_x = PID(2.0, 0.01, 0.8)
-        self.pid_y = PID(2.0, 0.01, 0.8)
-        self.pid_z = PID(3.0, 0.05, 1.2)
+        self.pid_x = PID(3.0, 0.01, 0.8)
+        self.pid_y = PID(3.0, 0.01, 0.8)
+        self.pid_z = PID(5.0, 0.05, 1.2)
 
         # Variable para controlar el hilo de hover
         self.hover_stop_event = None
@@ -136,8 +136,8 @@ class DroneNavigator:
         dt = 0.1      # intervalo de tiempo
 
         # Parámetros para la detección de mínimos locales
-        epsilon_force = 0.01       # umbral para considerar que hay un mínimo local
-        local_min_threshold = 50   # iteraciones consecutivas con fuerza muy pequeña
+        epsilon_force = 0.1       # umbral para considerar que hay un mínimo local
+        local_min_threshold = 10   # iteraciones consecutivas con fuerza muy pequeña
         local_min_counter = 0
 
         trajectory = []  # almacena la trayectoria seguida
