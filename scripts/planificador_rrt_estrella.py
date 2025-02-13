@@ -3,7 +3,7 @@
 import rospy
 import json
 import numpy as np
-from geometry_msgs.msg import TwistStamped  # Se utiliza TwistStamped en lugar de Twist
+from geometry_msgs.msg import TwistStamped  # Usamos TwistStamped para enviar velocidades
 from nav_msgs.msg import Odometry
 import subprocess
 from scipy.spatial import KDTree
@@ -122,6 +122,7 @@ class RRTStar:
 # Clase PID
 # -----------------------------------------------------------------------------
 # Controlador PID para cada eje (X, Y, Z) del dron.
+# Se han ajustado los parámetros para obtener movimientos más suaves.
 # =============================================================================
 class PID:
     def __init__(self, kp, ki, kd, setpoint=0):
@@ -150,14 +151,15 @@ class DroneNavigator:
         rospy.init_node('drone_navigator', anonymous=True)
         self.bounds = bounds
         self.obstacles = obstacles
-        # Se utiliza TwistStamped para publicar comandos de velocidad
+        # Publicador para comandos de velocidad (TwistStamped)
         self.twist_pub = rospy.Publisher('/command/twist', TwistStamped, queue_size=10)
         self.pose_sub = rospy.Subscriber('/ground_truth/state', Odometry, self.pose_callback)
         self.current_pose = None
         self.rate = rospy.Rate(10)
-        self.pid_x = PID(1.0, 0.01, 0.4)
-        self.pid_y = PID(1.0, 0.01, 0.4)
-        self.pid_z = PID(2.0, 0.05, 1.0)
+        # Parámetros PID ajustados para suavizar movimientos
+        self.pid_x = PID(0.5, 0.005, 0.1)
+        self.pid_y = PID(0.5, 0.005, 0.1)
+        self.pid_z = PID(0.8, 0.005, 0.1)
 
     def pose_callback(self, msg):
         self.current_pose = msg.pose.pose.position
@@ -188,10 +190,10 @@ class DroneNavigator:
             if rospy.is_shutdown():
                 break
 
-            # Definir el radio de proximidad
+            # Radio de proximidad para considerar que se alcanzó el waypoint
             proximity_radius = 0.3
 
-            # Establecer los setpoints del PID para cada eje
+            # Actualizar setpoints para cada eje
             self.pid_x.setpoint = waypoint[0]
             self.pid_y.setpoint = waypoint[1]
             self.pid_z.setpoint = waypoint[2]
@@ -206,7 +208,7 @@ class DroneNavigator:
                 waypoint_position = np.array(waypoint)
                 distance = np.linalg.norm(current_position - waypoint_position)
 
-                # Si se alcanza el waypoint, se envía un comando de velocidad cero
+                # Al alcanzar el waypoint se envía comando de velocidad cero
                 if distance < proximity_radius:
                     rospy.loginfo(f"Waypoint alcanzado: {waypoint}")
                     stop_twist = TwistStamped()
@@ -219,12 +221,20 @@ class DroneNavigator:
                     stop_twist.twist.angular.y = 0
                     stop_twist.twist.angular.z = 0
                     self.twist_pub.publish(stop_twist)
+
+                    # Si es el último waypoint, se mantiene en hover durante 2 segundos
+                    if i == len(waypoints) - 1:
+                        hover_duration = rospy.Duration(2.0)
+                        hover_end = rospy.Time.now() + hover_duration
+                        while rospy.Time.now() < hover_end and not rospy.is_shutdown():
+                            stop_twist.header.stamp = rospy.Time.now()
+                            self.twist_pub.publish(stop_twist)
+                            rospy.sleep(0.1)
                     break
 
-                # Tiempo de muestreo
-                dt = 0.1
+                dt = 0.1  # Tiempo de muestreo
 
-                # Calcular velocidades en cada eje mediante el controlador PID
+                # Calcular velocidades usando el controlador PID
                 vx = self.pid_x.compute(self.current_pose.x, dt)
                 vy = self.pid_y.compute(self.current_pose.y, dt)
                 vz = self.pid_z.compute(self.current_pose.z, dt)
@@ -245,12 +255,11 @@ class DroneNavigator:
 
     def display_route_plot(self, path, start, goal):
         """
-        Genera y muestra de forma interactiva una figura 3D con:
+        Muestra de forma interactiva una figura 3D con:
           - La trayectoria seguida (línea azul con marcadores)
           - El punto de inicio (verde)
           - El punto de destino (rojo)
-          - El mapa de obstáculos (cubo gris semitransparente)
-        La ventana quedará abierta hasta que el usuario la cierre.
+          - Los obstáculos (cubos grises semitransparentes)
         """
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
@@ -338,6 +347,7 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+
 
 
 
