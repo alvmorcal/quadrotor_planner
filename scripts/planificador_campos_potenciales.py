@@ -130,14 +130,14 @@ class DroneNavigator:
     # =============================================================================
     def potential_field_navigation(self, goal):
         # Parámetros para la navegación por campos potenciales
-        k_att = 1.0   # coeficiente de atracción
-        k_rep = 2.0   # coeficiente de repulsión
-        d0 = 2.0      # distancia de influencia de los obstáculos
+        k_att = 2.0   # coeficiente de atracción
+        k_rep = 3.0   # coeficiente de repulsión
+        d0 = 5.0      # distancia de influencia de los obstáculos
         dt = 0.1      # intervalo de tiempo
 
         # Parámetros para la detección de mínimos locales
         epsilon_force = 0.1       # umbral para considerar que hay un mínimo local
-        local_min_threshold = 10   # iteraciones consecutivas con fuerza muy pequeña
+        local_min_threshold = 25   # iteraciones consecutivas con fuerza muy pequeña
         local_min_counter = 0
 
         trajectory = []  # almacena la trayectoria seguida
