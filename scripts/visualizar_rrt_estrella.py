@@ -146,11 +146,15 @@ if __name__ == "__main__":
     with open("world.json", "r") as f:
         obstacles = json.load(f)["obstacles"]
 
-    start = [0, 0, 0]
+    start = [
+    float(input("(Origen) Ingrese X: ")), 
+    float(input("(Origen) Ingrese Y: ")), 
+    float(input("(Origen) Ingrese Z: "))
+    ]
     goal = [
-    float(input("Ingrese X: ")), 
-    float(input("Ingrese Y: ")), 
-    float(input("Ingrese Z: "))
+    float(input("(Meta)  Ingrese X: ")), 
+    float(input("(Meta) Ingrese Y: ")), 
+    float(input("(Meta) Ingrese Z: "))
     ]
 
     rrt_star = RRTStar(start, goal, bounds, obstacles)
